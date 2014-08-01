@@ -29,17 +29,18 @@ import matplotlib as plt
 
 
 def run_classifier(data, target, clf=None):
-    n_trials=10
+    n_trials = 10
     n_cv = 5
     if clf is None:
         clf = svm.SVC(kernel='linear', C=1)
     scores = np.empty([n_trials * n_cv])
     for n in range(n_trials):
         x, y = utils.shuffle(data, target, random_state=n)     
-        scores[n*n_cv:(n+1)*n_cv] = cross_validation.cross_val_score( clf, x, y, cv=n_cv, scoring='roc_auc')
+        scores[n*n_cv:(n+1)*n_cv] = cross_validation.cross_val_score(clf, x, y, cv=n_cv, scoring='roc_auc')
     return scores
 
-def make_tfidf_model(raw_corpus = None, no_below=1, no_above=1):
+
+def make_tfidf_model(raw_corpus=None, no_below=1, no_above=1):
     dictionary = corpora.Dictionary(raw_corpus)
     dictionary.filter_extremes(no_below=no_below, no_above=no_above)
     corpus = [dictionary.doc2bow(text) for text in raw_corpus]
@@ -48,16 +49,18 @@ def make_tfidf_model(raw_corpus = None, no_below=1, no_above=1):
 
 
 def make_mlda_model(corpus=None, dictionary=None, n_topics=2):
-    model =  MldaModel(n_topics=n_topics, dictionary=dictionary, bow_corpus=corpus, mallet=True)   
+    model = MldaModel(n_topics=n_topics, dictionary=dictionary, bow_corpus=corpus, mallet=True)
     return model        
     
-def test_tfidf(raw_corpus=None, no_above=1, no_below=1):    
-    tfidf_model, corpus, dictionary=make_tfidf_model(raw_corpus = raw_corpus, no_below=no_below, no_above=no_above)
-    data_tfidf =  matutils.corpus2dense(tfidf_model[corpus],num_terms=len(dictionary)).T
+
+def test_tfidf(raw_corpus=None, no_above=1, no_below=1):
+    tfidf_model, corpus, dictionary = make_tfidf_model(raw_corpus=raw_corpus, no_below=no_below, no_above=no_above)
+    data_tfidf = matutils.corpus2dense(tfidf_model[corpus], num_terms=len(dictionary)).T
     return data_tfidf
 
+
 def test_lda(mlda_model=None, tfidf_model=None, corpus=None, dictionary=None, n_topics=2):
-    data_tfidf = matutils.corpus2dense(tfidf_model[corpus],num_terms=len(dictionary)).T
+    data_tfidf = matutils.corpus2dense(tfidf_model[corpus], num_terms=len(dictionary)).T
     data_mlda = mlda_model.corpus2dense_lda(bow_corpus=corpus, dictionary=dictionary, n_topics=n_topics)
     if data_mlda is None:
         return data_tfidf
@@ -67,7 +70,7 @@ def test_lda(mlda_model=None, tfidf_model=None, corpus=None, dictionary=None, n_
         
 
 def test_mlda(mlda_model=None, tfidf_model=None, corpus=None, dictionary=None, n_topics=2):
-    data_tfidf = matutils.corpus2dense(tfidf_model[corpus],num_terms=len(dictionary)).T
+    data_tfidf = matutils.corpus2dense(tfidf_model[corpus], num_terms=len(dictionary)).T
     data_mlda = mlda_model.corpus2dense(bow_corpus=corpus, dictionary=dictionary, n_topics=n_topics)
     if data_mlda is None:
         return data_tfidf
@@ -75,8 +78,10 @@ def test_mlda(mlda_model=None, tfidf_model=None, corpus=None, dictionary=None, n
         x_data = np.concatenate((data_tfidf, data_mlda), axis=1)
     return x_data
 
+
 def test_lda_classifier(no_below=2, no_above=0.9, mallet=True, n_topics=3):
     return LdaClassifier(no_below=no_below, no_above=no_above, mallet=mallet, n_topics=n_topics)
+
 
 def test_mlda_classifier(no_below=2, no_above=0.9, mallet=True, n_topics=3):
     return MldaClassifier(no_below=no_below, no_above=no_above, mallet=mallet, n_topics=n_topics)
@@ -96,13 +101,15 @@ def test_parameter(function_name, parameters,  target=None, parameter_tosweep=No
             print p
             clf = function_name(**parameters)
             scores = run_classifier(x_data, target, clf)
-            f.write("%s " % ( str(p)))
+            f.write("%s " % (str(p)))
             f.write(" ".join(map(str, scores.tolist())) + "\n")
-            result.append( scores )    
+            f.flush()
+            result.append(scores)
             
     print filename, value_list, result
     plotutils.plot_xy(value_list, result, "n topics", "roc_auc", str(filename)+".pdf", 
-               color=color, s=100)
+                        color=color, s=100)
+
 
 def __main__():
 
@@ -114,14 +121,14 @@ def __main__():
     arguments = parser.parse_args()
 
     if ( arguments.filename is None) and (arguments.dataset is None):    
-        dataset="Estrogens"
+        dataset ="Estrogens"
         filename = "/Users/verasazonova/Work/medab_data/units_Estrogens.txt"
-    elif (arguments.filename is None):
+    elif arguments.filename is None:
         dataset = arguments.dataset
-        filename= "/Users/verasazonova/Work/medab_data/units_" + dataset + ".txt"
+        filename = "/Users/verasazonova/Work/medab_data/units_" + dataset + ".txt"
     else:
-        dataset="-tasdf-"
-        filename= arguments.filename
+        dataset ="-tasdf-"
+        filename = arguments.filename
         
     print filename
     
@@ -185,17 +192,17 @@ def __main__():
     max_n_topics = 20    
     
     parameters = {"no_below": 2, "no_above": 0.9, 
-                  "mallet": True, "n_topics":2}
+                  "mallet": True, "n_topics": 2}
     parameter_tosweep = "n_topics"
     value_list = range(0, max_n_topics+1, 4)
     
     X = np.array([text for text in mra])
     y = np.array(mra.get_target()) 
     
-    logfilename=dataset+"_ldalog.txt"
+    logfilename = dataset+"_ldalog.txt"
     test_parameter(test_lda_classifier, parameters, target=y, 
                    parameter_tosweep=parameter_tosweep, value_list=value_list, 
-                   filename = "lda", color='g', logfilename=logfilename, x_data=X)
+                   filename="lda", color='g', logfilename=logfilename, x_data=X)
     
     #logfilename=dataset+"_mldalog.txt"
     #test_parameter(test_mlda_classifier, parameters, target=y,
@@ -222,5 +229,5 @@ def __main__():
     np.savetxt("Estrogens_tam_path.txt", scores) 
 '''
 
-if __name__== "__main__":
+if __name__ == "__main__":
     __main__()
