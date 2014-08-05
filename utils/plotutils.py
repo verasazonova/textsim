@@ -64,6 +64,7 @@ def __main__():
     #x, scores = readscores(filename)
     #plot_xy(x, scores, "n_topics", "roc", "mlda", color='g', s=100)
 
+    """
     similarities = np.loadtxt("/home/vera/Work/TextVisualization/Experiments/40/Estrogens_tam_vector.txt")
     y1 = similarities.mean()
     plt.plot([0, 20], [y1, y1], 'b-', label="vector")
@@ -71,11 +72,12 @@ def __main__():
     similarities2 = np.loadtxt("/home/vera/Work/TextVisualization/Experiments/40/Estrogens_tam_path.txt")
     y2 = similarities2.mean()
     plt.plot([0, 20], [y2, y2], 'y-', label="path")
+    """
 
     plt.legend(loc=2)
     plt.grid()
-    plt.title("Estrogens")
-    plt.savefig("Estrogens_tam_lda_sim.pdf")
+    plt.title(filename)
+    plt.savefig(filename+".pdf")
 
 
 if __name__ == "__main__":
