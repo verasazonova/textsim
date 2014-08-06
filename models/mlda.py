@@ -35,6 +35,7 @@ def make_bow(raw_corpus=None, bow_corpus=None, dictionary=None):
 
 
 class ModelClassifier(BaseEstimator, ClassifierMixin):
+
     def __init__(self, no_below=1, no_above=1, mallet=True, n_topics=2):
         self.clf = svm.SVC(kernel='linear', C=1)
         self.no_below = no_below
@@ -68,21 +69,24 @@ class SimDictClassifier(ModelClassifier):
     Builds a join tfidf - similarity matrix model.
     """
 
-    def build_models(self, x, dictname):
-        self.dictionary = corpora.Dictionary(x)
-        self.dictionary.filter_extremes(no_below=self.no_below, no_above=self.no_above)
+    def __init__(self, no_below=1, no_above=1, simdictname=None, corpus=None):
+        super(SimDictClassifier, self).__init__(no_below=no_below, no_above=no_above, mallet=False, n_topics=0)
+        self.simdictname = simdictname
 
-        bow_corpus = [self.dictionary.doc2bow(text) for text in x]
-        self.tfidf_model = models.TfidfModel(bow_corpus, normalize=True)
+    def build_models(self, x):
 
         # dictname="/home/vera/Work/TextVisualization/dicts/estrogens-mesh-msr-path.txt"
-        self.sim_dict = simdict.readdict(dictname, self.dictionary)
+        self.sim_dict = simdict.SimDictModel(self.simdictname, corpus=x, no_below=self.no_below, no_above=self.no_above)
 
     ''' Prepare a numpy array of values from the models and tokenized text'''
     def pre_process(self, x):
 
-        bow_corpus = [self.dictionary.doc2bow(text) for text in x]
-        x_data = simdict.calculate_similarities(self.tfidf_model[bow_corpus], self.sim_dict, num_terms=len(self.dictionary))
+        bow_corpus = [self.sim_dict.dictionary.doc2bow(text) for text in x]
+
+        if self.sim_dict is None:
+            x_data = matutils.corpus2dense(self.sim_dict.tfidf_model[bow_corpus], num_terms=len(self.sim_dict.dictionary)).T
+        else:
+            x_data = self.sim_dict.calculate_similarities(self.sim_dict.tfidf_model[bow_corpus])
         return x_data
 
 

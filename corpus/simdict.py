@@ -13,39 +13,6 @@ from gensim import corpora, matutils
 import math
 import numpy as np
 
-
-def readdict(filename, dictionary=None):
-    similarity_model = {}
-    with open(filename, 'r') as f:
-        for line in f:
-            # print line
-            m = re.search('(.*)<>(.*)\(.*\)<>(.*)\(.*\)', line.strip())
-            if m:
-                similarity = float(m.group(1))
-                word1 = str((m.group(2)).replace(" ", "_"))
-                word2 = str((m.group(3)).replace(" ", "_"))
-                if (word1 in dictionary.token2id) and (word2 in dictionary.token2id):
-                    # should they be ordered?
-                    id1 = dictionary.token2id[word1]
-                    id2 = dictionary.token2id[word2]
-                    if id1 < id2:
-                        similarity_model[(id1, id2)] = similarity
-                    else:
-                        similarity_model[(id2, id1)] = similarity
-            else:
-                print "Parsing error"
-                return None
-    return similarity_model
-
-
-def make_tfidf_model(raw_corpus=None, no_below=1, no_above=1):
-    dictionary = corpora.Dictionary(raw_corpus)
-    dictionary.filter_extremes(no_below=no_below, no_above=no_above)
-    corpus = [dictionary.doc2bow(text) for text in raw_corpus]
-    tfidf_model = TfidfModel(corpus, normalize=True)
-    return tfidf_model, corpus, dictionary
-
-
 def calculate_length(doc):
     sum = 0
     for word, weight in doc:
@@ -54,8 +21,7 @@ def calculate_length(doc):
         return math.sqrt(sum)
     else:
         print doc
-        return 0
-
+    return 0
 
 def calculate_similarity(doc1, doc2, sim_dict):
     # print model[doc1]
@@ -73,12 +39,53 @@ def calculate_similarity(doc1, doc2, sim_dict):
                 sum += weight_1 * weight_2 * sim_dict[key]
     return sum / (calculate_length(doc1) * calculate_length(doc2))
 
+class SimDictModel:
 
-def calculate_similarities(corpus, sim_dict, num_terms=0):
-    similarities = np.array([[calculate_similarity(doc1, doc2, sim_dict) for doc1 in corpus] for doc2 in corpus])
-    print similarities.shape
-    print matutils.corpus2dense(corpus, num_terms=num_terms).shape
-    return np.concatenate((matutils.corpus2dense(corpus, num_terms=num_terms).T, similarities), axis=1)
+    def __init__(self, filename, corpus=None, no_below=1, no_above=1):
+        self.dictionary = corpora.Dictionary(corpus)
+        self.dictionary.filter_extremes(no_below=no_below, no_above=no_above)
+        self.bow_corpus = [self.dictionary.doc2bow(text) for text in corpus]
+        self.tfidf_model = TfidfModel(self.bow_corpus, normalize=True)
+        if filename is None:
+            self.simdict = None
+        else:
+            self.simdict = self.readdict(filename, self.dictionary)
+
+
+    @staticmethod
+    def readdict(filename, dictionary=None):
+        similarity_model = {}
+        with open(filename, 'r') as f:
+            for line in f:
+                # print line
+                m = re.search('(.*)<>(.*)\(.*\)<>(.*)\(.*\)', line.strip())
+                if m:
+                    similarity = float(m.group(1))
+                    word1 = str((m.group(2)).replace(" ", "_"))
+                    word2 = str((m.group(3)).replace(" ", "_"))
+                    if (word1 in dictionary.token2id) and (word2 in dictionary.token2id):
+                        # should they be ordered?
+                        id1 = dictionary.token2id[word1]
+                        id2 = dictionary.token2id[word2]
+                        if id1 < id2:
+                            similarity_model[(id1, id2)] = similarity
+                        else:
+                            similarity_model[(id2, id1)] = similarity
+                else:
+                    print "Parsing error"
+                    return None
+        return similarity_model
+
+
+    """ corpus is a bow corpus """
+    def calculate_similarities(self, corpus):
+        num_terms = len(self.dictionary)
+        if self.simdict is None:
+            return matutils.corpus2dense(corpus, num_terms=num_terms).T
+        similarities = np.array([[calculate_similarity(doc1, doc2, self.simdict) for doc1 in self.bow_corpus] for doc2 in corpus])
+        print similarities.shape
+        print matutils.corpus2dense(corpus, num_terms=num_terms).shape
+        return np.concatenate((matutils.corpus2dense(corpus, num_terms=num_terms).T, similarities), axis=1)
 
 
 def __main__():
@@ -95,11 +102,11 @@ def __main__():
 
     mra = MedicalReviewAbstracts(dataset_filename, ['M'])
 
-    model, corpus, dictionary = make_tfidf_model(mra)
+#    model, corpus, dictionary = make_tfidf_model(mra)
 
-    sim_dict = readdict(filename, dictionary)
+#    sim_dict = readdict(filename, dictionary)
 
-    print calculate_similarities(model[corpus], sim_dict, num_terms=len(dictionary)).shape
+#    print calculate_similarities(model[corpus], sim_dict, num_terms=len(dictionary)).shape
 
 # print model[corpus[0]]
 # for word in word_list:
