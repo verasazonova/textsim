@@ -15,6 +15,7 @@ import string
 import random
 import os
 import os.path
+import abc
 
 
 def make_bow(raw_corpus=None, bow_corpus=None, dictionary=None):
@@ -35,6 +36,8 @@ def make_bow(raw_corpus=None, bow_corpus=None, dictionary=None):
 
 
 class ModelClassifier(BaseEstimator, ClassifierMixin):
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self, no_below=1, no_above=1, mallet=True, n_topics=2):
         self.clf = svm.SVC(kernel='linear', C=1)
         self.no_below = no_below
@@ -45,6 +48,22 @@ class ModelClassifier(BaseEstimator, ClassifierMixin):
         self.dictionary = None
         self.tfidf_model = None
         self.model = None
+
+    @abc.abstractmethod
+    def build_models(self, x):
+        """
+        Builds a model for the classifier
+        :param x: data
+        :return: -
+        """
+
+    @abc.abstractmethod
+    def pre_process(self, x):
+        """
+        Pre-process the data, used in training and testing data.
+        :param x: the data
+        :return: -
+        """
 
     def fit(self, x, y):
         # self.classes_, indices = np.unique(["foo", "bar", "foo"], return_inverse=True)
