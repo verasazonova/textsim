@@ -9,7 +9,6 @@ Created on Thu Jul 10 12:48:40 2014
 from gensim.models import TfidfModel
 from gensim import corpora, matutils
 from corpus.medical import MedicalReviewAbstracts
-from corpus import simdict
 from models.mlda import MldaModel, MldaClassifier, LdaClassifier, SimDictClassifier
 from utils import plotutils
 from sklearn import cross_validation, svm, utils
@@ -77,8 +76,10 @@ def test_lda_classifier(no_below=2, no_above=0.9, mallet=True, n_topics=3):
 def test_mlda_classifier(no_below=2, no_above=0.9, mallet=True, n_topics=3):
     return MldaClassifier(no_below=no_below, no_above=no_above, mallet=mallet, n_topics=n_topics)
 
+
 def test_simdict_classifier(no_below=2, no_above=0.9, simdictname=None):
     return SimDictClassifier(no_below=no_below, no_above=no_above, simdictname=simdictname)
+
 
 def test_parameter(function_name, parameters, target=None, parameter_tosweep=None,
                    value_list=None, filename="test", color='b', logfilename="log.txt",
@@ -139,7 +140,6 @@ def __main__():
         parameter_tosweep = "n_topics"
         value_list = range(0, max_n_topics + 1, 4)
 
-
         logfilename = dataset + "_" + test_type + ".txt"
         test_parameter(test_lda_classifier, parameters, target=y,
                        parameter_tosweep=parameter_tosweep, value_list=value_list,
@@ -150,7 +150,6 @@ def __main__():
         #               parameter_tosweep=parameter_tosweep, value_list=value_list,
         #               filename = "mlda", color='r', logfilename=logfilename, x_data=X)
 
-
     elif arguments.test_simdict:
         test_type = "simdict"
 
@@ -159,7 +158,7 @@ def __main__():
         else:
             simdictname = arguments.simdictname
 
-        parameters = {"no_below": 2, "no_above": 0.9, "simdictname":None}
+        parameters = {"no_below": 2, "no_above": 0.9, "simdictname": None}
         parameter_tosweep = "simdictname"
         value_list = [None, simdictname]
         logfilename = dataset + "_" + test_type + ".txt"

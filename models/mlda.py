@@ -35,7 +35,6 @@ def make_bow(raw_corpus=None, bow_corpus=None, dictionary=None):
 
 
 class ModelClassifier(BaseEstimator, ClassifierMixin):
-
     def __init__(self, no_below=1, no_above=1, mallet=True, n_topics=2):
         self.clf = svm.SVC(kernel='linear', C=1)
         self.no_below = no_below
@@ -43,6 +42,9 @@ class ModelClassifier(BaseEstimator, ClassifierMixin):
         self.mallet = mallet
         self.n_topics = n_topics
         self.mallet_path = "/Users/verasazonova/Work/JARS/mallet-2.0.7/bin/mallet"
+        self.dictionary = None
+        self.tfidf_model = None
+        self.model = None
 
     def fit(self, x, y):
         # self.classes_, indices = np.unique(["foo", "bar", "foo"], return_inverse=True)
@@ -69,9 +71,10 @@ class SimDictClassifier(ModelClassifier):
     Builds a join tfidf - similarity matrix model.
     """
 
-    def __init__(self, no_below=1, no_above=1, simdictname=None, corpus=None):
+    def __init__(self, no_below=1, no_above=1, simdictname=None):
         super(SimDictClassifier, self).__init__(no_below=no_below, no_above=no_above, mallet=False, n_topics=0)
         self.simdictname = simdictname
+        self.sim_dict = None
 
     def build_models(self, x):
 
@@ -79,12 +82,14 @@ class SimDictClassifier(ModelClassifier):
         self.sim_dict = simdict.SimDictModel(self.simdictname, corpus=x, no_below=self.no_below, no_above=self.no_above)
 
     ''' Prepare a numpy array of values from the models and tokenized text'''
+
     def pre_process(self, x):
 
         bow_corpus = [self.sim_dict.dictionary.doc2bow(text) for text in x]
 
         if self.sim_dict is None:
-            x_data = matutils.corpus2dense(self.sim_dict.tfidf_model[bow_corpus], num_terms=len(self.sim_dict.dictionary)).T
+            x_data = matutils.corpus2dense(self.sim_dict.tfidf_model[bow_corpus],
+                                           num_terms=len(self.sim_dict.dictionary)).T
         else:
             x_data = self.sim_dict.calculate_similarities(self.sim_dict.tfidf_model[bow_corpus])
         return x_data
@@ -112,13 +117,9 @@ class LdaClassifier(ModelClassifier):
         else:
 
             if self.mallet:
-                # tmp_dir="/home/vera/Work/mallet_tmp/" + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))+"/"
-                # while os.path.isdir(tmp_dir):
-                # tmp_dir="/home/vera/Work/mallet_tmp/" + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))+"/"
-                # os.makedirs(tmp_dir)
-                self.model = models.ldamallet.LdaMallet(self.mallet_path, corpus=bow_corpus, num_topics=self.n_topics,
-                                                        id2word=self.dictionary, workers=4,
-                                                        optimize_interval=10, iterations=1000)
+                self.model = models.LdaMallet(self.mallet_path, corpus=bow_corpus, num_topics=self.n_topics,
+                                              id2word=self.dictionary, workers=4,
+                                              optimize_interval=10, iterations=1000)
 
             else:
                 self.model = models.LdaModel(bow_corpus, id2word=self.dictionary, num_topics=self.n_topics,
@@ -197,9 +198,9 @@ class MldaModel:
                         tmp_dir = "/home/vera/Work/mallet_tmp/" + ''.join(
                             random.choice(string.ascii_uppercase + string.digits) for _ in range(6)) + "/"
                     os.makedirs(tmp_dir)
-                    self.models.append(models.ldamallet.LdaMallet(mallet_path, corpus=bow_corpus, num_topics=n,
-                                                                  id2word=dictionary, workers=4, prefix=tmp_dir,
-                                                                  optimize_interval=10, iterations=1000))
+                    self.models.append(models.LdaMallet(mallet_path, corpus=bow_corpus, num_topics=n,
+                                                        id2word=dictionary, workers=4, prefix=tmp_dir,
+                                                        optimize_interval=10, iterations=1000))
 
                 else:
                     self.models.append(models.LdaModel(bow_corpus, id2word=dictionary, num_topics=n, distributed=False,

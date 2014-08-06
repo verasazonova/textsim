@@ -5,28 +5,28 @@ Created on Tue Jul 29 14:10:33 2014
 @author: vera
 """
 
-from medical import MedicalReviewAbstracts
-import argparse
 import re
 from gensim.models import TfidfModel
 from gensim import corpora, matutils
 import math
 import numpy as np
 
+
 def calculate_length(doc):
-    sum = 0
+    weight_sum = 0
     for word, weight in doc:
-        sum += weight * weight
-    if sum > 0:
-        return math.sqrt(sum)
+        weight_sum += weight * weight
+    if weight_sum > 0:
+        return math.sqrt(weight_sum)
     else:
         print doc
     return 0
 
+
 def calculate_similarity(doc1, doc2, sim_dict):
     # print model[doc1]
     # print model[doc2]
-    sum = 0
+    weight_sum = 0
     if not doc1 or not doc2:
         return 0
     for word_1, weight_1 in doc1:
@@ -36,8 +36,9 @@ def calculate_similarity(doc1, doc2, sim_dict):
             else:
                 key = (word_2, word_1)
             if key in sim_dict:
-                sum += weight_1 * weight_2 * sim_dict[key]
-    return sum / (calculate_length(doc1) * calculate_length(doc2))
+                weight_sum += weight_1 * weight_2 * sim_dict[key]
+    return weight_sum / (calculate_length(doc1) * calculate_length(doc2))
+
 
 class SimDictModel:
 
@@ -50,7 +51,6 @@ class SimDictModel:
             self.simdict = None
         else:
             self.simdict = self.readdict(filename, self.dictionary)
-
 
     @staticmethod
     def readdict(filename, dictionary=None):
@@ -76,7 +76,6 @@ class SimDictModel:
                     return None
         return similarity_model
 
-
     """ corpus is a bow corpus """
     def calculate_similarities(self, corpus):
         num_terms = len(self.dictionary)
@@ -89,18 +88,8 @@ class SimDictModel:
 
 
 def __main__():
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-f', action='store', dest='filename', help='Data filename')
-    arguments = parser.parse_args()
-
-    if arguments.filename is None:
-        dataset_filename = "/home/vera/Work/TextVisualization/MedAb_Data/units_Estrogens.txt"
-        filename = "/home/vera/Work/TextVisualization/dicts/estrogens-mesh-msr-vector.txt"
-    else:
-        filename = arguments.filename
-        dataset_filename = "none"
-
-    mra = MedicalReviewAbstracts(dataset_filename, ['M'])
+    pass
+#    mra = MedicalReviewAbstracts(dataset_filename, ['M'])
 
 #    model, corpus, dictionary = make_tfidf_model(mra)
 
@@ -111,8 +100,6 @@ def __main__():
 # print model[corpus[0]]
 # for word in word_list:
 # if word in dictionary.token2id:
-
-
 
 # print dictionary
 if __name__ == "__main__":
