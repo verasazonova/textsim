@@ -31,7 +31,8 @@ def readarticles(filename, article_fields):
                     if m.group(1) == 'K':
                         article_dict['class'] = m.group(2)
                     if m.group(1) in article_fields:
-                        # if in the middle of the article, and the fields are one of the valid ones - create the out dictionary
+                        # if in the middle of the article, and the fields are one of the valid ones -
+                        # create the out dictionary
                         for field in article_fields:
                             if m.group(1) == field:
                                 # for separate fields - copy the field
@@ -59,6 +60,11 @@ def word_valid(word):
 def word_tokenize(text):
     tokens = [word.translate(None, '!?.,;:\'\"') for word in text.translate(None, '()[]').lower().split() if
               word_valid(word)]
+    return tokens
+
+
+def sent_tokenize(text):
+    tokens = [sent for sent in text.split('. ')]
     return tokens
 
 

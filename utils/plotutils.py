@@ -20,20 +20,37 @@ def stat_different(x1, x2):
     return False
 
 
-def plot_xy(x, scores, x_label, y_label, filename, color='b', s=50):
+def plot_xy(x_str, scores, x_label, y_label, filename, color='b', s=50):
     cpool = ['black', color]
     cmap3 = col.ListedColormap(cpool, 'indexed')
     cm.register_cmap(cmap=cmap3)
 
+    x, x_tags = to_number(x_str)
+
+    print x, x_tags
+
     y = map(np.mean, scores)
     score_base = scores[0]
     colors = [1 if stat_different(score, score_base) else 0 for score in scores]
+
     plt.plot(x, y, ls='--', c=color, label=filename)
     plt.scatter(x, y, s=s, cmap=cmap3, marker='o', c=colors,
                 linewidths=(0,), alpha=0.6)
+    if x_tags is not None:
+        plt.xticks(x, x_tags, rotation=6)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     print colors
+
+
+def to_number(a):
+    print a
+    try:
+        data = np.array(a, dtype=float)
+        return data, None
+    except ValueError:
+        u, ind = np.unique(a, return_index=True)
+        return ind, u[ind]
 
 
 def readscores(filename):
@@ -41,24 +58,28 @@ def readscores(filename):
     x = []
     with open(filename, 'r') as f:
         for line in f:
-            x.append(line.split()[0])
-            scores.append(np.array(map(float, line.split()[1:])))
+            values = line.split()
+            x.append(values[0])
+            scores.append(np.array(map(float, values[1:])))
 
     return x, scores
 
 
 def __main__():
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-f', action='store', dest='filename', help='Data filename')
+    parser.add_argument('-f', action='store', nargs="+", dest='filename', help='Data filename')
     arguments = parser.parse_args()
 
+    '''
     if arguments.filename is None:
         filename = "/home/vera/Work/TextVisualization/Experiments/40/units_Antihistamines.txt_ldalog.txt"
     else:
         filename = arguments.filename
+    '''
 
-    x, scores = readscores(filename)
-    plot_xy(x, scores, "n_topics", "roc", "lda", color='g', s=80)
+    for filename in arguments.filename:
+        x, scores = readscores(filename)
+        plot_xy(x, scores, filename, "roc", "", color='g', s=80)
 
     # filename = "/home/vera/Work/Spyder/textsim/textsim/medabs_mlda_log3.txt"
     #x, scores = readscores(filename)

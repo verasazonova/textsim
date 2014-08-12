@@ -18,15 +18,16 @@ import matplotlib as plt
 # import logging
 
 
-def run_classifier(data, target, clf=None):
+def run_classifier(x, y, clf=None):
     n_trials = 10
     n_cv = 5
     if clf is None:
         clf = svm.SVC(kernel='linear', C=1)
     scores = np.empty([n_trials * n_cv])
     for n in range(n_trials):
-        x, y = utils.shuffle(data, target, random_state=n)
-        scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(clf, x, y, cv=n_cv, scoring='roc_auc')
+        print n
+        skf = cross_validation.StratifiedKFold(y, n_folds=n_cv, random_state=n, shuffle=True)
+        scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(clf, x, y, cv=skf, scoring='roc_auc')
     return scores
 
 
@@ -86,7 +87,7 @@ def test_parameter(function_name, parameters, target=None, parameter_tosweep=Non
                    x_data=None):
     print "Testing parameter %s in function %s" % (parameter_tosweep, function_name)
     result = []
-    with open(logfilename, 'w') as f:
+    with open(logfilename, 'a') as f:
         # f.write("# %s;  %s \n" % (str(parameter_tosweep), str(parameters)))
         for p in value_list:
             parameters[parameter_tosweep] = p
@@ -110,7 +111,7 @@ def __main__():
     parser.add_argument('-f', action='store', dest='filename', help='Data filename')
     parser.add_argument('-d', action='store', dest='dataset', help='Dataset name')
     parser.add_argument('-m', action='store', dest='model', help='Dataset name')
-    parser.add_argument('-s', action='store', dest='simdictname', help='Similarity dictionary name')
+    parser.add_argument('-s', action='store', nargs="+", dest='simdictname', help='Similarity dictionary name')
     parser.add_argument('--lda', action='store_true', dest='test_lda', help='If on test lda features')
     parser.add_argument('--sd', action='store_true', dest='test_simdict', help='If on test simdict features')
     arguments = parser.parse_args()
@@ -154,13 +155,13 @@ def __main__():
         test_type = "simdict"
 
         if arguments.simdictname is None:
-            simdictname = "/Users/verasazonova/Work/TextVisualization/dicts/estrogens-mesh-msr-path.txt"
+            simdictlist = ["/Users/verasazonova/Work/TextVisualization/dicts/estrogens-mesh-msr-path.txt"]
         else:
-            simdictname = arguments.simdictname
+            simdictlist = arguments.simdictname
 
         parameters = {"no_below": 2, "no_above": 0.9, "simdictname": None}
         parameter_tosweep = "simdictname"
-        value_list = [None, simdictname]
+        value_list = [None] + simdictlist
         logfilename = dataset + "_" + test_type + ".txt"
 
         test_parameter(test_simdict_classifier, parameters, target=y,
