@@ -49,8 +49,10 @@ class PubMedCentralOpenSubset():
         with open(self.filename) as f:
             for line in f:
                 sents = sent_tokenize(line)
-                words = [word_tokenize(sent) for sent in sents]
-                yield words
+                for sent in sents:
+                    current_sent = word_tokenize(sent)
+                    if current_sent:
+                        yield current_sent
 
 
 def __main__():

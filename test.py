@@ -6,21 +6,23 @@ Created on Thu Jul 10 12:48:40 2014
 @author: vera
 """
 
-from gensim.models import TfidfModel
+from gensim.models import TfidfModel, Word2Vec
 from gensim import corpora, matutils
 from corpus.medical import MedicalReviewAbstracts
 from models.mlda import MldaModel, MldaClassifier, LdaClassifier, SimDictClassifier
+from models.pmc_w2v import W2VModelClassifier
 from utils import plotutils
-from sklearn import cross_validation, svm, utils
+from sklearn import cross_validation, svm
 import numpy as np
 import argparse
 import matplotlib as plt
-# import logging
+import logging
 
 
 def run_classifier(x, y, clf=None):
     n_trials = 10
     n_cv = 5
+    print x.shape, y.shape
     if clf is None:
         clf = svm.SVC(kernel='linear', C=1)
     scores = np.empty([n_trials * n_cv])
@@ -81,6 +83,9 @@ def test_mlda_classifier(no_below=2, no_above=0.9, mallet=True, n_topics=3):
 def test_simdict_classifier(no_below=2, no_above=0.9, simdictname=None):
     return SimDictClassifier(no_below=no_below, no_above=no_above, simdictname=simdictname)
 
+def test_w2v_classifier(no_below=2, no_above=0.9, w2v_model=None, model_type='none'):
+    return W2VModelClassifier(no_below=no_below, no_above=no_above, w2v_model=w2v_model, model_type=model_type)
+
 
 def test_parameter(function_name, parameters, target=None, parameter_tosweep=None,
                    value_list=None, filename="test", color='b', logfilename="log.txt",
@@ -106,7 +111,7 @@ def test_parameter(function_name, parameters, target=None, parameter_tosweep=Non
 
 
 def __main__():
-    # logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-f', action='store', dest='filename', help='Data filename')
     parser.add_argument('-d', action='store', dest='dataset', help='Dataset name')
@@ -114,14 +119,15 @@ def __main__():
     parser.add_argument('-s', action='store', nargs="+", dest='simdictname', help='Similarity dictionary name')
     parser.add_argument('--lda', action='store_true', dest='test_lda', help='If on test lda features')
     parser.add_argument('--sd', action='store_true', dest='test_simdict', help='If on test simdict features')
+    parser.add_argument('--w2v', action='store_true', dest='test_w2v', help='If on test w2v features')
     arguments = parser.parse_args()
 
     if (arguments.filename is None) and (arguments.dataset is None):
         dataset = "Estrogens"
-        filename = "/Users/verasazonova/Work/medab_data/units_Estrogens.txt"
+        filename = "/Users/verasazonova/no-backup/medab_data/units_Estrogens.txt"
     elif arguments.filename is None:
         dataset = arguments.dataset
-        filename = "/Users/verasazonova/Work/medab_data/units_" + dataset + ".txt"
+        filename = "/Users/verasazonova/no-backup/medab_data/units_" + dataset + ".txt"
     else:
         dataset = "-tasdf-"
         filename = arguments.filename
@@ -165,6 +171,24 @@ def __main__():
         logfilename = dataset + "_" + test_type + ".txt"
 
         test_parameter(test_simdict_classifier, parameters, target=y,
+                       parameter_tosweep=parameter_tosweep, value_list=value_list,
+                       filename=test_type, color='b', logfilename=logfilename, x_data=x)
+
+    elif arguments.test_w2v:
+        test_type = "word2vec"
+
+        if arguments.simdictname is None:
+            w2v_model_name = "/Users/verasazonova/no-backup/pubmed_central/pmc_100_5"
+        else:
+            w2v_model_name = arguments.simdictname
+
+        w2v_model = Word2Vec.load(w2v_model_name)
+        parameters = {"no_below": 2, "no_above": 0.9, "w2v_model": w2v_model, "model_type": 'none'}
+        parameter_tosweep = "model_type"
+        value_list = ['none', 'averaged', 'stacked']
+        logfilename = dataset + "_" + test_type + ".txt"
+
+        test_parameter(test_w2v_classifier, parameters, target=y,
                        parameter_tosweep=parameter_tosweep, value_list=value_list,
                        filename=test_type, color='b', logfilename=logfilename, x_data=x)
 

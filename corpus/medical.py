@@ -10,6 +10,7 @@ import argparse
 import os.path
 import re
 from nltk.corpus import stopwords
+from nltk.tokenize import sent_tokenize
 
 
 def readarticles(filename, article_fields):
@@ -63,9 +64,10 @@ def word_tokenize(text):
     return tokens
 
 
-def sent_tokenize(text):
-    tokens = [sent for sent in text.split('. ')]
-    return tokens
+#def sent_tokenize(text):
+#    tokens = [sent for sent in text.split('. ')]
+#    tokens = nl
+#    return tokens
 
 
 def mesh_tokenize(text):
