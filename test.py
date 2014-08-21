@@ -15,7 +15,7 @@ from utils import plotutils
 from sklearn import cross_validation, svm
 import numpy as np
 import argparse
-import matplotlib as plt
+from matplotlib import pyplot as plt
 import logging
 
 
@@ -25,7 +25,8 @@ def run_classifier(x, y, clf=None):
     print x.shape, y.shape
     if clf is None:
         clf = svm.SVC(kernel='linear', C=1)
-    scores = np.empty([n_trials * n_cv])
+    scores = np.zeros((n_trials * n_cv))
+#    scores = np.empty([n_trials * n_cv])
     for n in range(n_trials):
         print n
         skf = cross_validation.StratifiedKFold(y, n_folds=n_cv, random_state=n, shuffle=True)
@@ -83,6 +84,7 @@ def test_mlda_classifier(no_below=2, no_above=0.9, mallet=True, n_topics=3):
 def test_simdict_classifier(no_below=2, no_above=0.9, simdictname=None):
     return SimDictClassifier(no_below=no_below, no_above=no_above, simdictname=simdictname)
 
+
 def test_w2v_classifier(no_below=2, no_above=0.9, w2v_model=None, model_type='none'):
     return W2VModelClassifier(no_below=no_below, no_above=no_above, w2v_model=w2v_model, model_type=model_type)
 
@@ -137,6 +139,7 @@ def __main__():
     mra = MedicalReviewAbstracts(filename, ['T', 'A', 'M'])
     x = np.array([text for text in mra])
     y = np.array(mra.get_target())
+    test_type = "none"
 
     if arguments.test_lda:
         max_n_topics = 20
@@ -193,9 +196,9 @@ def __main__():
                        filename=test_type, color='b', logfilename=logfilename, x_data=x)
 
 
-    plt.pyplot.legend()
-    plt.pyplot.title(dataset)
-    plt.pyplot.savefig(dataset + "_tam_" + test_type + ".pdf")
+    plt.legend()
+    plt.title(dataset)
+    plt.savefig(dataset + "_tam_" + test_type + ".pdf")
 
     '''
     parameters = {"raw_corpus": mra, "no_above":1, "no_below":1}
