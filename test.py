@@ -215,7 +215,7 @@ def __main__():
         w2v_model = Word2Vec.load(w2v_model_name)
         #w2v_model = None
 
-        parameters = {"no_below": 2, "no_above": 0.9, "w2v_model": None, "model_type": 'augmented', "topn":200}
+        parameters = {"no_below": 2, "no_above": 0.9, "w2v_model": None, "model_type": 'augmented', "topn": 200}
         parameter_tosweep = "topn"
         value_list = [200, 300]
         logfilename = dataset + "_" + test_type + ".txt"
