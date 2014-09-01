@@ -9,7 +9,7 @@ Created on Wed Jul  9 10:22:19 2014
 import argparse
 import os.path
 import re
-#from nltk.corpus import stopwords
+from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
 
 
@@ -49,8 +49,8 @@ stop_filename = "stopwords.txt"
 if os.path.isfile(stop_filename):
     stop = set([word.strip() for word in open(stop_filename, 'r').readlines()])
 else:
-#    stop = set(stopwords.words('english'))
-    stop = set(['a', 'the'])
+    stop = set(stopwords.words('english'))
+#    stop = set(['a', 'the'])
 
 def word_valid(word):
     if (word in stop) or len(word) < 2 or re.match('\d+([,.]\d)*', word):
