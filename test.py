@@ -13,6 +13,7 @@ from models.mlda import MldaModel, MldaClassifier, LdaClassifier, SimDictClassif
 from models.pmc_w2v import W2VModelClassifier
 from utils import plotutils
 from sklearn import cross_validation, svm
+from sklearn.utils import shuffle
 import numpy as np
 import os
 import argparse
@@ -31,8 +32,9 @@ def run_classifier(x, y, clf=None, fit_parameters=None):
 #    scores = np.empty([n_trials * n_cv])
     for n in range(n_trials):
         logging.info("Testing: trial %i or %i" % (n, n_trials))
-        skf = cross_validation.StratifiedKFold(y, n_folds=n_cv, random_state=n, shuffle=True)
-        scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(clf, x, y, cv=skf, scoring='roc_auc',
+        x_shuffled, y_shuffled = shuffle(x, y, random_state=n)
+        skf = cross_validation.StratifiedKFold(y_shuffled, n_folds=n_cv) #, random_state=n, shuffle=True)
+        scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(clf, x_shuffled, y_shuffled, cv=skf, scoring='roc_auc',
                                                                            verbose=2, n_jobs=1,
                                                                            fit_params=fit_parameters)
     return scores
