@@ -129,6 +129,8 @@ def __main__():
     parser.add_argument('--w2v-topn', action='store_true', dest='test_w2v_topn', help='If on test w2v features')
     arguments = parser.parse_args()
 
+    print "Hello"
+
     if (arguments.filename is None) and (arguments.dataset is None):
         dataset = "Estrogens"
         filename = "/Users/verasazonova/no-backup/medab_data/units_Estrogens.txt"
