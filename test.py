@@ -32,7 +32,8 @@ def run_classifier(x, y, clf=None, fit_parameters=None):
         logging.info("Testing: trial %i or %i" % (n, n_trials))
         skf = cross_validation.StratifiedKFold(y, n_folds=n_cv, random_state=n, shuffle=True)
         scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(clf, x, y, cv=skf, scoring='roc_auc',
-                                                                           verbose=2, n_jobs=1, fit_params=fit_parameters)
+                                                                           verbose=2, n_jobs=1,
+                                                                           fit_params=fit_parameters)
     return scores
 
 
