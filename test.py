@@ -19,18 +19,20 @@ from matplotlib import pyplot as plt
 import logging
 
 
-def run_classifier(x, y, clf=None):
+def run_classifier(x, y, clf=None, fit_parameters=None):
     n_trials = 10
     n_cv = 5
     print x.shape, y.shape
+    logging.info("Testing: fit parameters %s " % (fit_parameters,))
     if clf is None:
         clf = svm.SVC(kernel='linear', C=1)
     scores = np.zeros((n_trials * n_cv))
 #    scores = np.empty([n_trials * n_cv])
     for n in range(n_trials):
-        print n
+        logging.info("Testing: trial %i or %i" % (n, n_trials))
         skf = cross_validation.StratifiedKFold(y, n_folds=n_cv, random_state=n, shuffle=True)
-        scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(clf, x, y, cv=skf, scoring='roc_auc')
+        scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(clf, x, y, cv=skf, scoring='roc_auc',
+                                                                           verbose=2, n_jobs=1, fit_params=fit_parameters)
     return scores
 
 
@@ -85,13 +87,14 @@ def test_simdict_classifier(no_below=2, no_above=0.9, simdictname=None):
     return SimDictClassifier(no_below=no_below, no_above=no_above, simdictname=simdictname)
 
 
-def test_w2v_classifier(no_below=2, no_above=0.9, w2v_model=None, model_type='none'):
-    return W2VModelClassifier(no_below=no_below, no_above=no_above, w2v_model=w2v_model, model_type=model_type)
+def test_w2v_classifier(no_below=2, no_above=0.9, w2v_model=None, model_type='none', topn=100):
+    return W2VModelClassifier(no_below=no_below, no_above=no_above, w2v_model=w2v_model, model_type=model_type,
+                              topn=topn)
 
 
 def test_parameter(function_name, parameters, target=None, parameter_tosweep=None,
                    value_list=None, filename="test", color='b', logfilename="log.txt",
-                   x_data=None):
+                   x_data=None, fit_parameters=None):
     print "Testing parameter %s in function %s" % (parameter_tosweep, function_name)
     result = []
     with open(logfilename, 'a') as f:
@@ -101,7 +104,7 @@ def test_parameter(function_name, parameters, target=None, parameter_tosweep=Non
             #x_data = function_name(**parameters)
             print p
             clf = function_name(**parameters)
-            scores = run_classifier(x_data, target, clf)
+            scores = run_classifier(x_data, target, clf=clf, fit_parameters=fit_parameters)
             f.write("%s " % (str(p)))
             f.write(" ".join(map(str, scores.tolist())) + "\n")
             f.flush()
@@ -122,6 +125,7 @@ def __main__():
     parser.add_argument('--lda', action='store_true', dest='test_lda', help='If on test lda features')
     parser.add_argument('--sd', action='store_true', dest='test_simdict', help='If on test simdict features')
     parser.add_argument('--w2v', action='store_true', dest='test_w2v', help='If on test w2v features')
+    parser.add_argument('--w2v-topn', action='store_true', dest='test_w2v_topn', help='If on test w2v features')
     arguments = parser.parse_args()
 
     if (arguments.filename is None) and (arguments.dataset is None):
@@ -136,7 +140,7 @@ def __main__():
 
     print filename
 
-    mra = MedicalReviewAbstracts(filename, ['T', 'A', 'M'])
+    mra = MedicalReviewAbstracts(filename, ['T', 'A'])
     x = np.array([text for text in mra])
     y = np.array(mra.get_target())
     test_type = "none"
@@ -186,15 +190,40 @@ def __main__():
             w2v_model_name = arguments.simdictname
 
         w2v_model = Word2Vec.load(w2v_model_name)
-        parameters = {"no_below": 2, "no_above": 0.9, "w2v_model": w2v_model, "model_type": 'none'}
+        #w2v_model = None
+
+        parameters = {"no_below": 2, "no_above": 0.9, "w2v_model": None, "model_type": 'none'}
         parameter_tosweep = "model_type"
         value_list = ['none', 'averaged', 'stacked']
         logfilename = dataset + "_" + test_type + ".txt"
 
+        fit_parameters = {"model": w2v_model}
         test_parameter(test_w2v_classifier, parameters, target=y,
                        parameter_tosweep=parameter_tosweep, value_list=value_list,
-                       filename=test_type, color='b', logfilename=logfilename, x_data=x)
+                       filename=test_type, color='b', logfilename=logfilename, x_data=x,
+                       fit_parameters=fit_parameters)
 
+    elif arguments.test_w2v_topn:
+        test_type = "word2vec_topn"
+
+        if arguments.simdictname is None:
+            w2v_model_name = "/Users/verasazonova/no-backup/pubmed_central/pmc_100_5"
+        else:
+            w2v_model_name = arguments.simdictname
+
+        w2v_model = Word2Vec.load(w2v_model_name)
+        #w2v_model = None
+
+        parameters = {"no_below": 2, "no_above": 0.9, "w2v_model": None, "model_type": 'augmented', "topn":200}
+        parameter_tosweep = "topn"
+        value_list = [200, 300]
+        logfilename = dataset + "_" + test_type + ".txt"
+
+        fit_parameters = {"model": w2v_model}
+        test_parameter(test_w2v_classifier, parameters, target=y,
+                       parameter_tosweep=parameter_tosweep, value_list=value_list,
+                       filename=test_type, color='b', logfilename=logfilename, x_data=x,
+                       fit_parameters=fit_parameters)
 
     plt.legend()
     plt.title(dataset)

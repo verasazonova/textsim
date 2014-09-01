@@ -16,6 +16,7 @@ import random
 import os
 import os.path
 import abc
+import logging
 
 
 def make_bow(raw_corpus=None, bow_corpus=None, dictionary=None):
@@ -50,7 +51,7 @@ class ModelClassifier(BaseEstimator, ClassifierMixin):
         self.model = None
 
     @abc.abstractmethod
-    def build_models(self, x):
+    def build_models(self, x, model):
         """
         Builds a model for the classifier
         :param x: data
@@ -65,12 +66,14 @@ class ModelClassifier(BaseEstimator, ClassifierMixin):
         :return: -
         """
 
-    def fit(self, x, y):
+    def fit(self, x, y, model=None):
         # self.classes_, indices = np.unique(["foo", "bar", "foo"], return_inverse=True)
         # self.majority_ = np.argmax(np.bincount(indices))
         # self.classes_, y = np.unique(y, return_inverse=True)
-        self.build_models(x)
+        logging.info("MC: model %s" % (model, ))
+        self.build_models(x, model)
         x_data = self.pre_process(x)
+        logging.info("ModelClassifier: fitting data with shape %s " % (x_data.shape,))
         return self.clf.fit(x_data, y)
 
     def decision_function(self, x):
