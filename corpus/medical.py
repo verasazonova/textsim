@@ -58,6 +58,7 @@ def word_valid(word):
     return True
 
 
+
 def word_tokenize(text):
     tokens = [word.translate(None, '!?.,;:\'\"') for word in text.translate(None, '()[]').lower().split() if
               word_valid(word)]
