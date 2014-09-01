@@ -14,6 +14,7 @@ from models.pmc_w2v import W2VModelClassifier
 from utils import plotutils
 from sklearn import cross_validation, svm
 import numpy as np
+import os
 import argparse
 from matplotlib import pyplot as plt
 import logging
@@ -129,14 +130,14 @@ def __main__():
     parser.add_argument('--w2v-topn', action='store_true', dest='test_w2v_topn', help='If on test w2v features')
     arguments = parser.parse_args()
 
-    print "Hello"
 
+    prefix = os.environ.get("MEDAB_DATA")
     if (arguments.filename is None) and (arguments.dataset is None):
         dataset = "Estrogens"
-        filename = "/Users/verasazonova/no-backup/medab_data/units_Estrogens.txt"
+        filename = prefix + "/units_Estrogens.txt"
     elif arguments.filename is None:
         dataset = arguments.dataset
-        filename = "/Users/verasazonova/no-backup/medab_data/units_" + dataset + ".txt"
+        filename = prefix + "/units_" + dataset + ".txt"
     else:
         dataset = "-tasdf-"
         filename = arguments.filename
@@ -192,6 +193,8 @@ def __main__():
         else:
             w2v_model_name = arguments.simdictname
 
+        print w2v_model_name
+
         w2v_model = Word2Vec.load(w2v_model_name)
         #w2v_model = None
 
@@ -212,7 +215,7 @@ def __main__():
         if arguments.simdictname is None:
             w2v_model_name = "/Users/verasazonova/no-backup/pubmed_central/pmc_100_5"
         else:
-            w2v_model_name = arguments.simdictname
+            w2v_model_name = arguments.simdictname[0]
 
         w2v_model = Word2Vec.load(w2v_model_name)
         #w2v_model = None
