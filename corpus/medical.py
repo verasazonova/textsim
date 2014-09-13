@@ -53,7 +53,7 @@ else:
 #    stop = set(['a', 'the'])
 
 def word_valid(word):
-    if (word in stop) or len(word) < 2 or re.match('\d+([,.]\d)*', word):
+    if (word in stop) or len(word) < 2 or re.match('\d+([,.]\d)*', word) or re.match(r".*\\.*", word):
         return False
     return True
 

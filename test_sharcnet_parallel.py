@@ -20,7 +20,7 @@ def __main__():
         skf = cross_validation.StratifiedKFold(y_shuffled, n_folds=n_cv)  # random_state=n, shuffle=True)
         scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(clf, x_shuffled, y_shuffled, cv=skf,
                                                                            scoring='accuracy',
-                                                                           verbose=0, n_jobs=n_cv)
+                                                                           verbose=2, n_jobs=n_cv)
     print scores
 
 if __name__ == "__main__":

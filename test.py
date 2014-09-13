@@ -10,7 +10,7 @@ from gensim.models import TfidfModel, Word2Vec
 from gensim import corpora, matutils
 from corpus.medical import MedicalReviewAbstracts
 from models.mlda import MldaModel, MldaClassifier, LdaClassifier, SimDictClassifier
-from models.pmc_w2v import W2VModelClassifier
+from models.pmc_w2v import W2VModelClassifier, augment_corpus
 from utils import plotutils
 from sklearn import cross_validation, svm
 from sklearn.utils import shuffle
@@ -126,6 +126,7 @@ def __main__():
     parser.add_argument('-f', action='store', dest='filename', help='Data filename')
     parser.add_argument('-d', action='store', dest='dataset', help='Dataset name')
     parser.add_argument('-m', action='store', dest='model', help='Dataset name')
+    parser.add_argument('--topn', action='store', dest='topn', default='0', help='Dataset name')
     parser.add_argument('-s', action='store', nargs="+", dest='simdictname', help='Similarity dictionary name')
     parser.add_argument('--lda', action='store_true', dest='test_lda', help='If on test lda features')
     parser.add_argument('--sd', action='store_true', dest='test_simdict', help='If on test simdict features')
@@ -147,9 +148,26 @@ def __main__():
     print filename
 
     mra = MedicalReviewAbstracts(filename, ['T', 'A'])
-    x = np.array([text for text in mra])
-    y = np.array(mra.get_target())
+    x = None
+    topn = int(arguments.topn)
+
+    if arguments.simdictname is not None and topn > 0:
+        w2v_model_name = arguments.simdictname[0]
+        print w2v_model_name
+
+        w2v_model = Word2Vec.load(w2v_model_name)
+        w2v_model.init_sims(replace=True)
+
+        x = np.array(augment_corpus(corpus=mra, w2v_model=w2v_model, topn=topn))
+        dataset += "-" + arguments.topn
+
+    else:
+        x = np.array([text for text in mra])
+
     test_type = "none"
+    y = np.array(mra.get_target())
+
+    print x
 
     if arguments.test_lda:
         max_n_topics = 20
@@ -190,15 +208,6 @@ def __main__():
     elif arguments.test_w2v:
         test_type = "word2vec"
 
-        if arguments.simdictname is None:
-            w2v_model_name = "/Users/verasazonova/no-backup/pubmed_central/pmc_100_5"
-        else:
-            w2v_model_name = arguments.simdictname
-
-        print w2v_model_name
-
-        w2v_model = Word2Vec.load(w2v_model_name)
-        w2v_model.init_sims(replace=True)
         #w2v_model = None
 
         parameters = {"no_below": 2, "no_above": 0.9, "w2v_model": None, "model_type": 'none'}

@@ -3,11 +3,12 @@ __author__ = 'verasazonova'
 from gensim.models import Word2Vec, TfidfModel
 from gensim import corpora, matutils
 from os.path import join, basename
-from corpus.medical import MedicalReviewAbstracts
+from corpus.medical import MedicalReviewAbstracts, word_valid
 from corpus.pmc import PubMedCentralOpenSubset
 from models.mlda import ModelClassifier
 import numpy as np
 import logging
+import re
 from sklearn.preprocessing import normalize
 
 
@@ -127,6 +128,18 @@ def create_w2v_model(filename, size=100, window=5):
     model.save(join(basename(filename), "pmc_%i_%i" % (size, window)))
 
 
+def augment_corpus(corpus=None, w2v_model=None, topn=100):
+    augmented_corpus = []
+    for text in corpus:
+        words_in_model = [word for word in text if word in w2v_model]
+        sim_words = [re.sub(r"\W", "_", tup[0]) for tup in w2v_model.most_similar(positive=words_in_model, topn=topn) if word_valid(tup[0])]
+        augmented_corpus.append(text[:] + sim_words)
+    with open("test.txt", 'w') as fout:
+        for text in augmented_corpus:
+            fout.write(", ".join(text) + "\n")
+    return augmented_corpus
+
+
 def __main__():
 
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -137,11 +150,14 @@ def __main__():
     # create_w2v_model(join(path, name))
 
     w2v_model = Word2Vec.load(join(path, name))
+    w2v_model.init_sims(replace=True)
 #    w2v_model = None
-    mra = MedicalReviewAbstracts(filename, ['T'])
+    mra = MedicalReviewAbstracts(filename, ['T', 'A', 'M'])
     x = np.array([text for text in mra])
-    stacked_model = W2VModel(w2v_model, corpus=x, no_above=0.9, no_below=2, model_type='stacked')
-    print stacked_model.corpus2dense()
+    augmented = augment_corpus(corpus=x, w2v_model=w2v_model, topn=300)
+    with open("Estrogens-300.txt", 'w') as fout:
+        for text in augmented:
+            fout.write(" ".join(text) + "\n")
 
 if __name__ == "__main__":
     __main__()

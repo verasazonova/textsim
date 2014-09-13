@@ -45,13 +45,13 @@ class ModelClassifier(BaseEstimator, ClassifierMixin):
         self.no_above = no_above
         self.mallet = mallet
         self.n_topics = n_topics
-        self.mallet_path = "/Users/verasazonova/Work/JARS/mallet-2.0.7/bin/mallet"
+        self.mallet_path = "/Users/verasazonova/no-backup/JARS/mallet-2.0.7/bin/mallet"
         self.dictionary = None
         self.tfidf_model = None
         self.model = None
 
     @abc.abstractmethod
-    def build_models(self, x, model):
+    def build_models(self, x, model=None):
         """
         Builds a model for the classifier
         :param x: data
@@ -98,7 +98,7 @@ class SimDictClassifier(ModelClassifier):
         self.simdictname = simdictname
         self.sim_dict = None
 
-    def build_models(self, x):
+    def build_models(self, x, model=None):
 
         # dictname="/home/vera/Work/TextVisualization/dicts/estrogens-mesh-msr-path.txt"
         self.sim_dict = simdict.SimDictModel(self.simdictname, corpus=x, no_below=self.no_below, no_above=self.no_above)
@@ -127,7 +127,7 @@ class LdaClassifier(ModelClassifier):
 
     ''' Build tfidf and mlda models'''
 
-    def build_models(self, x):
+    def build_models(self, x, model=None):
         self.dictionary = corpora.Dictionary(x)
         self.dictionary.filter_extremes(no_below=self.no_below, no_above=self.no_above)
 
@@ -172,7 +172,7 @@ class MldaClassifier(ModelClassifier):
 
     ''' Build tfidf and mlda models'''
 
-    def build_models(self, x):
+    def build_models(self, x, model=None):
         self.dictionary = corpora.Dictionary(x)
         self.dictionary.filter_extremes(no_below=self.no_below, no_above=self.no_above)
 

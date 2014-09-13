@@ -19,32 +19,33 @@ def stat_different(x1, x2):
         return True
     return False
 
+def plot_base(x, y, color='b', s=50):
+    plt.scatter(x, np.mean(y), s=s, marker="*", color=color)
 
-def plot_xy(x_str, scores, x_label, y_label, filename, color='b', s=50):
-    cpool = ['black', color]
+def plot_xy(x_str, scores, x_label, y_label, filename, color='b', s=50, score_base=None):
+    cpool = ['white', color]
     cmap3 = col.ListedColormap(cpool, 'indexed')
     cm.register_cmap(cmap=cmap3)
 
     x, x_tags = to_number(x_str)
 
-    print x, x_tags
-
     y = map(np.mean, scores)
-    score_base = scores[0]
+
+    print x, y
+    if score_base is None:
+        score_base = scores[0]
     colors = [1 if stat_different(score, score_base) else 0 for score in scores]
 
     plt.plot(x, y, ls='--', c=color, label=filename)
-    plt.scatter(x, y, s=s, cmap=cmap3, marker='o', c=colors,
-                linewidths=(0,), alpha=0.6)
+    plt.scatter(x, y, s=s, cmap=cmap3, marker='o', c=colors, vmin=0, vmax=1,
+                linewidths=(1,), alpha=1, edgecolors=color)
     if x_tags is not None:
         plt.xticks(x, x_tags, rotation=6)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    print colors
 
 
 def to_number(a):
-    print a
     try:
         data = np.array(a, dtype=float)
         return data, None
@@ -68,6 +69,13 @@ def readscores(filename):
 def __main__():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-f', action='store', nargs="+", dest='filename', help='Data filename')
+    parser.add_argument('-l', action='store', nargs="+", dest='labels', help='Data filename')
+    parser.add_argument('-x', action='store', dest='xlabel', default="", help='Data filename')
+    parser.add_argument('-y', action='store', dest='ylabel', default="", help='Data filename')
+    parser.add_argument('-o', action='store', dest='output', default="output", help='Data filename')
+    parser.add_argument('-t', action='store', dest='title', default="", help='Data filename')
+    parser.add_argument('-n', action='store', dest='base_ind', default="0", help='Data filename')
+
     arguments = parser.parse_args()
 
     '''
@@ -77,9 +85,18 @@ def __main__():
         filename = arguments.filename
     '''
 
-    for filename in arguments.filename:
+    colors = ['g', 'r', 'b', 'k', 'y']
+    score_base = None
+    base_ind = int(arguments.base_ind)
+    for i, filename in enumerate(arguments.filename):
         x, scores = readscores(filename)
-        plot_xy(x, scores, filename, "roc", "", color='g', s=80)
+        if i==base_ind:
+            # calculate statistical significance with respect to the very first datapoint
+            score_base = scores[0]
+        plot_xy(x, scores, filename, "roc", "", color=colors[i], s=80, score_base=score_base)
+        if i==base_ind:
+            plot_base(float(x[0]), score_base, color=colors[0])
+
 
     # filename = "/home/vera/Work/Spyder/textsim/textsim/medabs_mlda_log3.txt"
     #x, scores = readscores(filename)
@@ -95,10 +112,17 @@ def __main__():
     plt.plot([0, 20], [y2, y2], 'y-', label="path")
     """
 
-    plt.legend(loc=2)
+    if arguments.labels is None:
+        labels = arguments.filename
+    else:
+        labels = arguments.labels
+
+    plt.legend(labels, loc=0)
+    plt.xlabel(arguments.xlabel)
+    plt.ylabel(arguments.ylabel)
     plt.grid()
-    plt.title(filename)
-    plt.savefig(filename+".pdf")
+    plt.title(arguments.title)
+    plt.savefig(arguments.output + ".pdf")
 
 
 if __name__ == "__main__":
