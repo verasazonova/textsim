@@ -9,6 +9,7 @@ Created on Thu Jul 10 12:48:40 2014
 from gensim.models import TfidfModel, Word2Vec
 from gensim import corpora, matutils
 from corpus.medical import MedicalReviewAbstracts
+from corpus.twits import KenyanTweets
 from models.mlda import MldaModel, MldaClassifier, LdaClassifier, SimDictClassifier
 from models.pmc_w2v import W2VModelClassifier, augment_corpus
 from utils import plotutils
@@ -132,6 +133,8 @@ def __main__():
     parser.add_argument('--sd', action='store_true', dest='test_simdict', help='If on test simdict features')
     parser.add_argument('--w2v', action='store_true', dest='test_w2v', help='If on test w2v features')
     parser.add_argument('--w2v-topn', action='store_true', dest='test_w2v_topn', help='If on test w2v features')
+    parser.add_argument('--pword', action='store_true', dest='perword', help='whether similar words taken per word')
+    parser.add_argument('--kt', action='store_true', dest='kt', help='kenyan twits')
     arguments = parser.parse_args()
 
     prefix = os.environ.get("MEDAB_DATA")
@@ -147,9 +150,14 @@ def __main__():
 
     print filename
 
-    mra = MedicalReviewAbstracts(filename, ['T', 'A'])
+    if arguments.kt:
+        mra = KenyanTweets(arguments.filename)
+    else:
+        mra = MedicalReviewAbstracts(filename, ['T', 'A'])
     x = None
+
     topn = int(arguments.topn)
+    perword = arguments.perword
 
     if arguments.simdictname is not None and topn > 0:
         w2v_model_name = arguments.simdictname[0]
@@ -158,8 +166,12 @@ def __main__():
         w2v_model = Word2Vec.load(w2v_model_name)
         w2v_model.init_sims(replace=True)
 
-        x = np.array(augment_corpus(corpus=mra, w2v_model=w2v_model, topn=topn))
-        dataset += "-" + arguments.topn
+        x = np.array(augment_corpus(corpus=mra, w2v_model=w2v_model, topn=topn, perword=perword))
+        if perword:
+            perword_str = "-pw"
+        else:
+            perword_str = ""
+        dataset += "-" + arguments.topn + perword_str
 
     else:
         x = np.array([text for text in mra])
@@ -167,7 +179,6 @@ def __main__():
     test_type = "none"
     y = np.array(mra.get_target())
 
-    print x
 
     if arguments.test_lda:
         max_n_topics = 20
@@ -243,6 +254,21 @@ def __main__():
                        parameter_tosweep=parameter_tosweep, value_list=value_list,
                        filename=test_type, color='b', logfilename=logfilename, x_data=x,
                        fit_parameters=fit_parameters)
+
+    else:
+        max_n_topics = 0
+        test_type = "none"
+
+        parameters = {"no_below": 1, "no_above": 1,
+                      "mallet": True, "n_topics": 0}
+        parameter_tosweep = "n_topics"
+        value_list = range(0, max_n_topics + 1, 4)
+
+        logfilename = dataset + "_" + test_type + ".txt"
+        test_parameter(test_lda_classifier, parameters, target=y,
+                       parameter_tosweep=parameter_tosweep, value_list=value_list,
+                       filename=test_type, color='g', logfilename=logfilename, x_data=x)
+
 
     plt.legend()
     plt.title(dataset)

@@ -11,6 +11,7 @@ import os.path
 import re
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
+from gensim import corpora
 
 
 def readarticles(filename, article_fields):
@@ -83,6 +84,7 @@ def mesh_tokenize(text):
 class MedicalReviewAbstracts:
     def __init__(self, filename, article_fields):
         self.articles = readarticles(filename, article_fields)
+        self.dataset = os.path.basename(filename)
 
     def __iter__(self):
         for article in self.articles:
@@ -103,6 +105,23 @@ class MedicalReviewAbstracts:
         return [1 if article['class'] == 'I' else 0 for article in self.articles]
 
 
+    def print_statistics(self):
+
+        n = len(self.articles)
+        pos_ind = [i for i in range(n) if self.articles[i]['class'] == 'I' ]
+        n_pos = len(pos_ind)
+        #print "Dataset, Percent positives, # positives, # total: "
+        print self.dataset, n_pos*100.0 / n, n_pos, n
+
+
+def print_stats(mra):
+    mra.print_statistics()
+    x = [article for article in mra]
+    dictionary = corpora.Dictionary(x)
+    dictionary.filter_extremes(no_below=2, no_above=0.9)
+    print len(dictionary)
+
+
 def __main__():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-f', action='store', dest='filename', help='Data filename')
@@ -114,11 +133,10 @@ def __main__():
         filename = arguments.filename
 
     print filename
-    mra = MedicalReviewAbstracts(filename, ['T', 'A', 'M'])
+    mra = MedicalReviewAbstracts(filename, ['T', 'A'])
 
     # print mra.get_target()
-    for article in mra:
-        print article
+    print_stats(mra)
 
 
 if __name__ == "__main__":

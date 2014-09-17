@@ -128,11 +128,22 @@ def create_w2v_model(filename, size=100, window=5):
     model.save(join(basename(filename), "pmc_%i_%i" % (size, window)))
 
 
-def augment_corpus(corpus=None, w2v_model=None, topn=100):
+def augment_corpus(corpus=None, w2v_model=None, topn=100, perword=False):
+    """
+    Local parameter controls whether the similar words are taken per word or with the respect to the whole document
+    """
     augmented_corpus = []
     for text in corpus:
         words_in_model = [word for word in text if word in w2v_model]
-        sim_words = [re.sub(r"\W", "_", tup[0]) for tup in w2v_model.most_similar(positive=words_in_model, topn=topn) if word_valid(tup[0])]
+        if perword:
+            sim_words = []
+            for word in words_in_model:
+                sim_words += [re.sub(r"\W", "_", tup[0]) for tup in w2v_model.most_similar(positive=word, topn=topn)
+                              if word_valid(tup[0])]
+        else:
+            sim_words = [re.sub(r"\W", "_", tup[0]) for tup in w2v_model.most_similar(positive=words_in_model, topn=topn)
+                         if word_valid(tup[0])]
+
         augmented_corpus.append(text[:] + sim_words)
     with open("test.txt", 'w') as fout:
         for text in augmented_corpus:
