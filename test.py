@@ -8,7 +8,7 @@ Created on Thu Jul 10 12:48:40 2014
 
 from gensim.models import TfidfModel, Word2Vec
 from gensim import corpora, matutils
-from corpus.medical import MedicalReviewAbstracts
+from corpus.medical import MedicalReviewAbstracts, AugmentedCorpus
 from corpus.twits import KenyanTweets
 from models.mlda import MldaModel, MldaClassifier, LdaClassifier, SimDictClassifier
 from models.pmc_w2v import W2VModelClassifier, augment_corpus
@@ -121,64 +121,60 @@ def test_parameter(function_name, parameters, target=None, parameter_tosweep=Non
                       color=color, s=100)
 
 
-def __main__():
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-f', action='store', dest='filename', help='Data filename')
-    parser.add_argument('-d', action='store', dest='dataset', help='Dataset name')
-    parser.add_argument('-m', action='store', dest='model', help='Dataset name')
-    parser.add_argument('--topn', action='store', dest='topn', default='0', help='Dataset name')
-    parser.add_argument('-s', action='store', nargs="+", dest='simdictname', help='Similarity dictionary name')
-    parser.add_argument('--lda', action='store_true', dest='test_lda', help='If on test lda features')
-    parser.add_argument('--sd', action='store_true', dest='test_simdict', help='If on test simdict features')
-    parser.add_argument('--w2v', action='store_true', dest='test_w2v', help='If on test w2v features')
-    parser.add_argument('--w2v-topn', action='store_true', dest='test_w2v_topn', help='If on test w2v features')
-    parser.add_argument('--pword', action='store_true', dest='perword', help='whether similar words taken per word')
-    parser.add_argument('--kt', action='store_true', dest='kt', help='kenyan twits')
-    arguments = parser.parse_args()
+def prep_arguments(arguments):
 
     prefix = os.environ.get("MEDAB_DATA")
+    datasets = []
+    filenames = []
     if (arguments.filename is None) and (arguments.dataset is None):
-        dataset = "Estrogens"
-        filename = prefix + "/units_Estrogens.txt"
+        datasets = ["Estrogens"]
+        filenames = [prefix + "/units_Estrogens.txt"]
     elif arguments.filename is None:
-        dataset = arguments.dataset
-        filename = prefix + "/units_" + dataset + ".txt"
+        datasets = arguments.dataset
+        print datasets, prefix
+        filenames =  [prefix + "/units_" + dataset + ".txt" for dataset in datasets]
     else:
-        dataset = "-tasdf-"
-        filename = arguments.filename
+        exit()
 
-    print filename
+
+    topn = map(int, arguments.topn)
+    perword = arguments.perword
+    return datasets, filenames, topn, perword
+
+
+def test_one_file(filename, dataset, topn, perword, w2v_model, arguments):
 
     if arguments.kt:
-        mra = KenyanTweets(arguments.filename)
+        corpus = KenyanTweets(filename)
+    elif perword:
+        filename = dataset + "-" + str(topn) + "pw.txt"
+        corpus = AugmentedCorpus(filename)
     else:
-        mra = MedicalReviewAbstracts(filename, ['T', 'A'])
+        corpus = MedicalReviewAbstracts(filename, ['T', 'A'])
     x = None
 
-    topn = int(arguments.topn)
-    perword = arguments.perword
-
     if arguments.simdictname is not None and topn > 0:
-        w2v_model_name = arguments.simdictname[0]
-        print w2v_model_name
-
-        w2v_model = Word2Vec.load(w2v_model_name)
-        w2v_model.init_sims(replace=True)
-
-        x = np.array(augment_corpus(corpus=mra, w2v_model=w2v_model, topn=topn, perword=perword))
         if perword:
+            # corpus already augmented
+            x = np.array([text for text in corpus])
             perword_str = "-pw"
         else:
+            # augment the corpus per text
+            x = np.array(augment_corpus(corpus=corpus, w2v_model=w2v_model, topn=topn, perword=False))
             perword_str = ""
-        dataset += "-" + arguments.topn + perword_str
+        dataset += "-" + str(topn) + perword_str
 
     else:
-        x = np.array([text for text in mra])
+        x = np.array([text for text in corpus])
 
     test_type = "none"
-    y = np.array(mra.get_target())
+    y = np.array(corpus.get_target())
 
+    print x
+    print y
+
+    print dataset, perword
+    print len(x)
 
     if arguments.test_lda:
         max_n_topics = 20
@@ -187,17 +183,13 @@ def __main__():
         parameters = {"no_below": 2, "no_above": 0.9,
                       "mallet": True, "n_topics": 2}
         parameter_tosweep = "n_topics"
-        value_list = range(0, max_n_topics + 1, 4)
+        value_list = range(0, max_n_topics + 1, 8)
 
         logfilename = dataset + "_" + test_type + ".txt"
         test_parameter(test_lda_classifier, parameters, target=y,
                        parameter_tosweep=parameter_tosweep, value_list=value_list,
                        filename=test_type, color='g', logfilename=logfilename, x_data=x)
 
-        #logfilename=dataset+"_mldalog.txt"
-        #test_parameter(test_mlda_classifier, parameters, target=y,
-        #               parameter_tosweep=parameter_tosweep, value_list=value_list,
-        #               filename = "mlda", color='r', logfilename=logfilename, x_data=X)
 
     elif arguments.test_simdict:
         test_type = "simdict"
@@ -274,61 +266,36 @@ def __main__():
     plt.title(dataset)
     plt.savefig(dataset + "_tam_" + test_type + ".pdf")
 
-    '''
-    parameters = {"raw_corpus": mra, "no_above":1, "no_below":1}
-    parameter_tosweep = "no_below"
-    value_list = range(1,5)
-    test_parameter(test_tfidf, parameters, target=mra.get_target(),
-                   parameter_tosweep=parameter_tosweep, value_list=value_list,
-                   filename = "tfidf", color='b')
 
-    parameter_tosweep = "no_above"
-    value_list = [1, 0.9, 0.5, 0.3]
-    test_parameter(test_tfidf, parameters, target=mra.get_target(),
-                   parameter_tosweep=parameter_tosweep, value_list=value_list,
-                   filename = "tfidf", color='k')
+def __main__():
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('-f', action='store', dest='filename', help='Data filename')
+    parser.add_argument('-d', action='store', nargs="+", dest='dataset', help='Dataset name')
+    parser.add_argument('-m', action='store', dest='model', help='Dataset name')
+    parser.add_argument('--topn', action='store', nargs="+", dest='topn', default='0', help='Dataset name')
+    parser.add_argument('-s', action='store', nargs="+", dest='simdictname', help='Similarity dictionary name')
+    parser.add_argument('--lda', action='store_true', dest='test_lda', help='If on test lda features')
+    parser.add_argument('--sd', action='store_true', dest='test_simdict', help='If on test simdict features')
+    parser.add_argument('--w2v', action='store_true', dest='test_w2v', help='If on test w2v features')
+    parser.add_argument('--w2v-topn', action='store_true', dest='test_w2v_topn', help='If on test w2v features')
+    parser.add_argument('--pword', action='store_true', dest='perword', help='whether similar words taken per word')
+    parser.add_argument('--kt', action='store_true', dest='kt', help='kenyan twits')
+    arguments = parser.parse_args()
 
+    datasets, filenames, topns, perword = prep_arguments(arguments)
 
-    max_n_topics=20
+    if arguments.simdictname is not None:
+        w2v_model_name = arguments.simdictname[0]
+        print w2v_model_name
 
-    tfidf_model, corpus, dictionary = make_tfidf_model(raw_corpus=mra, no_below=2, no_above=0.9)
+        w2v_model = Word2Vec.load(w2v_model_name)
+        w2v_model.init_sims(replace=True)
 
-    if arguments.model is None:
-        mlda_model = make_mlda_model(corpus=corpus, dictionary=dictionary, n_topics=max_n_topics)
-        mlda_model.save("./models/" + dataset+"_mlda_"+str(max_n_topics))
-    else:
-        mlda_model = MldaModel.load(arguments.model, max_n_topics)
-
-
-    parameters = {"mlda_model": mlda_model, "tfidf_model":tfidf_model,
-                  "corpus": corpus, "dictionary":dictionary, "n_topics":2}
-    parameter_tosweep = "n_topics"
-    value_list = range(0, max_n_topics+1, 2)
-
-    logfilename=dataset+"_ldalog.txt"
-    test_parameter(test_lda, parameters, target=mra.get_target(),
-                   parameter_tosweep=parameter_tosweep, value_list=value_list,
-                   filename = "lda", color='g', logfilename=logfilename)
-
-
-    logfilename=dataset+"_mldalog.txt"
-    test_parameter(test_mlda, parameters, target=mra.get_target(),
-                   parameter_tosweep=parameter_tosweep, value_list=value_list,
-                   filename = "mlda", color='r',logfilename=logfilename)
-
-
-    plt.pyplot.legend()
-    plt.pyplot.title(dataset)
-    plt.pyplot.savefig(dataset+"_tam_mlda.pdf")
-
-#    plt.pyplot.savefig("test.pdf")
-
-#    model = LdaModel(corpus, id2word=dictionary, num_topics=10, distributed=False,
-#                     chunksize=2000, passes=10, update_every=5, alpha='auto',
-#                     eta=None, decay=0.5, eval_every=10, iterations=50, gamma_threshold=0.001)
-#
-#    print matutils.corpus2dense(model[corpus], num_terms=10)
-'''
+    for dataset, filename in zip(datasets, filenames):
+        for topn in topns:
+            print dataset, filename, topn
+            test_one_file(filename, dataset, topn, perword, w2v_model, arguments)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,9 @@ from corpus.medical import MedicalReviewAbstracts, word_valid
 from corpus.pmc import PubMedCentralOpenSubset
 from models.mlda import ModelClassifier
 import numpy as np
+import os.path
 import logging
+import argparse
 import re
 from sklearn.preprocessing import normalize
 
@@ -127,48 +129,87 @@ def create_w2v_model(filename, size=100, window=5):
     model = Word2Vec(pmc_corpus, size=size, window=window, workers=4)
     model.save(join(basename(filename), "pmc_%i_%i" % (size, window)))
 
+sim_cache = {}
 
-def augment_corpus(corpus=None, w2v_model=None, topn=100, perword=False):
+def augment_corpus(corpus=None, w2v_model=None, topn=[100], perword=False):
     """
     Local parameter controls whether the similar words are taken per word or with the respect to the whole document
     """
-    augmented_corpus = []
-    for text in corpus:
+    max_topn = np.max(np.array(topn))
+    print max_topn
+    augmented_corpus = {}
+    for n in topn:
+        augmented_corpus[n] = []
+    for i, text in enumerate(corpus):
         words_in_model = [word for word in text if word in w2v_model]
+        augmented_text = {}
+        for n in topn:
+            augmented_text[n] = text[:]
+        print i, len(corpus)
         if perword:
             sim_words = []
             for word in words_in_model:
-                sim_words += [re.sub(r"\W", "_", tup[0]) for tup in w2v_model.most_similar(positive=word, topn=topn)
-                              if word_valid(tup[0])]
+                if word not in sim_cache:
+                    sim_cache[word] = [re.sub(r"\W", "_", tup[0])
+                                       for tup in w2v_model.most_similar(positive=word, topn=max_topn)
+                                       if word_valid(tup[0])]
+                sim_words = sim_cache[word]
+                for n in topn:
+                    augmented_text[n] += sim_words[0:n]
         else:
-            sim_words = [re.sub(r"\W", "_", tup[0]) for tup in w2v_model.most_similar(positive=words_in_model, topn=topn)
+            sim_words = [re.sub(r"\W", "_", tup[0]) for tup in w2v_model.most_similar(positive=words_in_model, topn=max_topn)
                          if word_valid(tup[0])]
+            for n in topn:
+                augmented_text[n] += sim_words[0:n]
 
-        augmented_corpus.append(text[:] + sim_words)
-    with open("test.txt", 'w') as fout:
-        for text in augmented_corpus:
-            fout.write(", ".join(text) + "\n")
+        for n in topn:
+            augmented_corpus[n].append(augmented_text[n])
     return augmented_corpus
+
+
+def prep_arguments(arguments):
+
+    prefix = os.environ.get("MEDAB_DATA")
+    datasets = []
+    filenames = []
+    if arguments.dataset is None:
+        datasets = ["Estrogens"]
+        filenames = [prefix + "/units_Estrogens.txt"]
+    else:
+        datasets = arguments.dataset
+        print datasets, prefix
+        filenames =  [prefix + "/units_" + dataset + ".txt" for dataset in datasets]
+
+    topn = map(int, arguments.topn)
+    perword = arguments.perword
+    return datasets, filenames, topn, perword
 
 
 def __main__():
 
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
-    path = "/Users/verasazonova/no-backup/pubmed_central/"
-    name = "pmc_100_5"
-    filename = "/Users/verasazonova/no-backup/medab_data/units_Estrogens.txt"
-    # create_w2v_model(join(path, name))
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('-d', action='store', nargs="+", dest='dataset', help='Dataset name')
+    parser.add_argument('-m', action='store', dest='model', help='model')
+    parser.add_argument('--topn', action='store', nargs="+", dest='topn', default='0', help='Dataset name')
+    parser.add_argument('--pword', action='store_true', dest='perword', help='whether similar words taken per word')
+    arguments = parser.parse_args()
 
-    w2v_model = Word2Vec.load(join(path, name))
+    datasets, filenames, topn, perword = prep_arguments(arguments)
+
+    w2v_model = Word2Vec.load(arguments.model)
     w2v_model.init_sims(replace=True)
-#    w2v_model = None
-    mra = MedicalReviewAbstracts(filename, ['T', 'A', 'M'])
-    x = np.array([text for text in mra])
-    augmented = augment_corpus(corpus=x, w2v_model=w2v_model, topn=300)
-    with open("Estrogens-300.txt", 'w') as fout:
-        for text in augmented:
-            fout.write(" ".join(text) + "\n")
+
+    for dataset, filename in zip(datasets, filenames):
+        mra = MedicalReviewAbstracts(filename, ['T', 'A'])
+        x = np.array([text for text in mra])
+        y = mra.get_target()
+        augmented = augment_corpus(corpus=x, w2v_model=w2v_model, topn=topn, perword=True)
+        for n in topn:
+            with open(str(dataset) + "-" + str(n) + "pw.txt", 'w') as fout:
+                for text, c in zip(augmented[n], y):
+                    fout.write(" ".join(text) + ", " + str(c) + "\n")
 
 if __name__ == "__main__":
     __main__()

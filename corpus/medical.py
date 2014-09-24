@@ -81,6 +81,23 @@ def mesh_tokenize(text):
     return tokens
 
 
+class AugmentedCorpus:
+    def __init__(self, filename):
+        self.filename = filename
+        self.target = []
+
+    def __iter__(self):
+        with open(self.filename, 'r') as f:
+            for line in f:
+                self.target.append(int(line.strip().split(',')[1]))
+                yield line.strip().split(',')[0].split()
+
+    def get_target(self):
+        if self.target:
+            return self.target
+        else:
+            print "you must iterated the class first"
+
 class MedicalReviewAbstracts:
     def __init__(self, filename, article_fields):
         self.articles = readarticles(filename, article_fields)
