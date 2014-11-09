@@ -10,13 +10,14 @@ import numpy as np
 from corpus.medical import MedicalReviewAbstracts
 from corpus import simdict
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn import svm
+from sklearn import svm, neighbors
 import string
 import random
 import os
 import os.path
 import abc
 import logging
+import math
 
 
 def make_bow(raw_corpus=None, bow_corpus=None, dictionary=None):
@@ -37,7 +38,7 @@ def make_bow(raw_corpus=None, bow_corpus=None, dictionary=None):
 
 
 class ModelClassifier(BaseEstimator, ClassifierMixin):
-    __metaclass__ = abc.ABCMeta
+#    __metaclass__ = abc.ABCMeta
 
     def __init__(self, no_below=1, no_above=1, mallet=True, n_topics=2):
         self.clf = svm.SVC(kernel='linear', C=1)
@@ -50,28 +51,30 @@ class ModelClassifier(BaseEstimator, ClassifierMixin):
         self.tfidf_model = None
         self.model = None
 
-    @abc.abstractmethod
+#    @abc.abstractmethod
     def build_models(self, x, model=None):
         """
         Builds a model for the classifier
         :param x: data
         :return: -
         """
+        raise NotImplementedError("Please Implement this method")
 
-    @abc.abstractmethod
+#    @abc.abstractmethod
     def pre_process(self, x):
         """
         Pre-process the data, used in training and testing data.
         :param x: the data
         :return: -
         """
+        raise NotImplementedError("Please Implement this method")
 
     def fit(self, x, y, model=None):
         # self.classes_, indices = np.unique(["foo", "bar", "foo"], return_inverse=True)
         # self.majority_ = np.argmax(np.bincount(indices))
-        # self.classes_, y = np.unique(y, return_inverse=True)
-        logging.info("MC: model %s" % (model, ))
+        #self.classes_, y = np.unique(y, return_inverse=True)
         self.build_models(x, model)
+        logging.info("MC: model %s, classifier %s" % (model, self.clf))
         x_data = self.pre_process(x)
         logging.info("ModelClassifier: fitting data with shape %s " % (x_data.shape,))
         return self.clf.fit(x_data, y)
@@ -84,9 +87,38 @@ class ModelClassifier(BaseEstimator, ClassifierMixin):
         # return self.classes_[np.argmax(D, axis=1)]
 
         x_data = self.pre_process(x)
+        #return self.classes_[self.clf.predict(x_data)]
         return self.clf.predict(x_data)
         # return np.repeat(self.classes_[self.majority_], len(X))
 
+
+    def predict_proba(self, x):
+        x_data = self.pre_process(x)
+        return self.clf.predict_proba(x_data)
+
+similarity_dict=None
+
+def similarity_metric(vec1, vec2):
+    # print model[doc1]
+    # print model[doc2]
+
+    l1 = math.sqrt(np.dot(vec1, vec1))
+    l2 = math.sqrt(np.dot(vec2, vec2))
+    if similarity_dict is None:
+        sim =  np.dot(vec1, vec2)
+    else:
+        weight_sum = 0
+        if l1 == 0 or l2 == 0:
+            sim = 0
+        else:
+            for i in range(len(vec1)):
+                for j in range(i, len(vec2)):
+                    if (i, j) in similarity_dict and vec1[i] != 0 and vec2[j] != 0:
+                        weight_sum += vec1[i] * vec2[j] * similarity_dict[ (i, j) ]
+
+            sim = weight_sum / (l1 * l2)
+    ''' to get distance subtract from one'''
+    return 1-sim
 
 class SimDictClassifier(ModelClassifier):
     """
@@ -96,16 +128,18 @@ class SimDictClassifier(ModelClassifier):
     def __init__(self, no_below=1, no_above=1, simdictname=None):
         super(SimDictClassifier, self).__init__(no_below=no_below, no_above=no_above, mallet=False, n_topics=0)
         self.simdictname = simdictname
-        self.sim_dict = None
+        self.sd_model = None
 
     def build_models(self, x, model=None):
 
         # dictname="/home/vera/Work/TextVisualization/dicts/estrogens-mesh-msr-path.txt"
-        self.sim_dict = simdict.SimDictModel(self.simdictname, corpus=x, no_below=self.no_below, no_above=self.no_above)
+        self.sd_model = simdict.SimDictModel(self.simdictname, corpus=x)
+        global similarity_dict
+        similarity_dict = self.sd_model.simdict
+        self.clf = neighbors.KNeighborsClassifier(algorithm='auto', metric=similarity_metric)
 
-    ''' Prepare a numpy array of values from the models and tokenized text'''
-
-    def pre_process(self, x):
+    ''' Prepare a numpy array of values from the models and tokenized text
+    def pre_process_old(self, x):
 
         bow_corpus = [self.sim_dict.dictionary.doc2bow(text) for text in x]
 
@@ -115,7 +149,11 @@ class SimDictClassifier(ModelClassifier):
         else:
             x_data = self.sim_dict.calculate_similarities(self.sim_dict.tfidf_model[bow_corpus])
         return x_data
+    '''
 
+    def pre_process(self, x):
+        bow_corpus = [self.sd_model.dictionary.doc2bow(text) for text in x]
+        return matutils.corpus2dense(self.sd_model.tfidf_model[bow_corpus], num_terms=len(self.sd_model.dictionary), num_docs=len(bow_corpus)).T
 
 class LdaClassifier(ModelClassifier):
     """

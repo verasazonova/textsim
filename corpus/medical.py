@@ -47,17 +47,21 @@ def readarticles(filename, article_fields):
 
 
 stop_filename = "stopwords.txt"
-if os.path.isfile(stop_filename):
-    stop = set([word.strip() for word in open(stop_filename, 'r').readlines()])
+stop_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), stop_filename)
+print stop_path
+if os.path.isfile(stop_path):
+    print "Using stopwords.txt as stopword list"
+    stop = set([word.strip() for word in open(stop_path, 'r').readlines()])
 else:
+    print "Using nltk stopwords"
     stop = set(stopwords.words('english'))
 #    stop = set(['a', 'the'])
 
 def word_valid(word):
-    if (word in stop) or len(word) < 2 or re.match('\d+([,.]\d)*', word) or re.match(r".*\\.*", word):
+    if (word in stop) or len(word) < 2 or re.match('\d+([,.]\d)*', word) or re.match(r".*\\.*", word) \
+            or re.match(r"\W+", word):
         return False
     return True
-
 
 
 def word_tokenize(text):
@@ -128,32 +132,51 @@ class MedicalReviewAbstracts:
         pos_ind = [i for i in range(n) if self.articles[i]['class'] == 'I' ]
         n_pos = len(pos_ind)
         #print "Dataset, Percent positives, # positives, # total: "
-        print self.dataset, n_pos*100.0 / n, n_pos, n
+        return self.dataset, n_pos*100.0 / n, n_pos, n
 
 
 def print_stats(mra):
-    mra.print_statistics()
+    name, p_pos, n_pos, n = mra.print_statistics()
     x = [article for article in mra]
+    y = mra.get_target()
     dictionary = corpora.Dictionary(x)
     dictionary.filter_extremes(no_below=2, no_above=0.9)
-    print len(dictionary)
+    n_w =  len(dictionary)
+    x_pos = [article for i, article in enumerate(mra) if y[i] == 1]
+    dictionary_pos = corpora.Dictionary(x_pos)
+    dictionary_pos.filter_extremes(no_below=2, no_above=0.9)
+    n_w_pos = len(dictionary_pos)
+    print ", ".join(map(str, [name, p_pos, n_pos, n, n_w, n_w_pos]))
+
+def prep_arguments(arguments):
+
+    prefix = os.environ.get("MEDAB_DATA")
+    datasets = []
+    filenames = []
+    if (arguments.filename is None) and (arguments.dataset is None):
+        datasets = ["Estrogens"]
+        filenames = [prefix + "/units_Estrogens.txt"]
+    elif arguments.filename is None:
+        datasets = arguments.dataset
+        print datasets, prefix
+        filenames =  [prefix + "/units_" + dataset + ".txt" for dataset in datasets]
+    else:
+        exit()
+
+    return datasets, filenames
 
 
 def __main__():
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-f', action='store', dest='filename', help='Data filename')
+    parser.add_argument('-f', action='store', nargs='+', dest='filename', help='Data filename')
+    parser.add_argument('-d', action='store', nargs="+", dest='dataset', help='Dataset name')
     arguments = parser.parse_args()
 
-    if arguments.filename is None:
-        filename = "/home/vera/Work/TextVisualization/MedAb_Data/units_Estrogens.txt"
-    else:
-        filename = arguments.filename
-
-    print filename
-    mra = MedicalReviewAbstracts(filename, ['T', 'A'])
-
-    # print mra.get_target()
-    print_stats(mra)
+    datasets, filenames = prep_arguments(arguments)
+    for filename in filenames:
+#        print filename
+        mra = MedicalReviewAbstracts(filename, ['T', 'A'])
+        print_stats(mra)
 
 
 if __name__ == "__main__":
