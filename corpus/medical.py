@@ -12,7 +12,7 @@ import re
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
 from gensim import corpora
-
+from gensim.models.doc2vec import LabeledSentence
 
 def readarticles(filename, article_fields):
     article_list = []
@@ -135,6 +135,27 @@ class MedicalReviewAbstracts:
         return self.dataset, n_pos*100.0 / n, n_pos, n
 
 
+
+class LabeledMedicalReviewAbstracts(MedicalReviewAbstracts):
+
+    def __iter__(self):
+        for article in self.articles:
+            text_tokens = []
+            mesh_tokens = []
+            if ('T' in article) and ('A' in article):
+                text_tokens = word_tokenize(article['T'] + article['A'])
+            elif 'A' in article:
+                text_tokens = word_tokenize(article['A'])
+            elif 'T' in article:
+                text_tokens = word_tokenize(article['T'])
+
+            if 'M' in article:
+                mesh_tokens = mesh_tokenize(article['M'])
+
+            yield LabeledSentence( text_tokens + mesh_tokens, [article['id']] )
+
+
+
 def print_stats(mra):
     name, p_pos, n_pos, n = mra.print_statistics()
     x = [article for article in mra]
@@ -147,6 +168,11 @@ def print_stats(mra):
     dictionary_pos.filter_extremes(no_below=2, no_above=0.9)
     n_w_pos = len(dictionary_pos)
     print ", ".join(map(str, [name, p_pos, n_pos, n, n_w, n_w_pos]))
+
+
+def get_filename(dataset):
+    prefix = os.environ.get("MEDAB_DATA")
+    return prefix + "/units_" + dataset + ".txt"
 
 def prep_arguments(arguments):
 
@@ -175,9 +201,10 @@ def __main__():
     datasets, filenames = prep_arguments(arguments)
     for filename in filenames:
 #        print filename
-        mra = MedicalReviewAbstracts(filename, ['T', 'A'])
-        print_stats(mra)
-
+        mra = LabeledMedicalReviewAbstracts(filename, ['T', 'A'])
+#        print_stats(mra)
+        for article in mra:
+            print article
 
 if __name__ == "__main__":
     __main__()

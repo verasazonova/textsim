@@ -8,7 +8,8 @@ from os import listdir
 from os.path import isfile, isdir, join, dirname
 import codecs
 from corpus.medical import sent_tokenize, word_tokenize
-from gensim.models import Word2Vec
+from gensim.models import Word2Vec, Doc2Vec
+from gensim.models.doc2vec import LabeledSentence
 import logging
 
 def remove_latex(s):
@@ -44,28 +45,43 @@ def construct_pmc(path):
 
 
 class PubMedCentralOpenSubset():
-    def __init__(self, filename):
+    def __init__(self, filename, labeled=True):
         self.filename = filename
+        self.labeled = labeled
 
     def __iter__(self):
+        cnt = 0
         with open(self.filename) as f:
             for line in f:
                 sents = sent_tokenize(line)
                 for sent in sents:
                     current_sent = word_tokenize(sent)
                     if current_sent:
-                        yield current_sent
+                        cnt += 1
+                        if self.labeled:
+                            yield LabeledSentence(current_sent, [str(cnt)])
+                        else:
+                            yield current_sent
 
 
-def create_w2v_model(filename, size=100, window=5):
+def create_w2v_model(filename, size=100, window=8, d2v=False):
     pmc_corpus = PubMedCentralOpenSubset(filename)
     logging.info("Corpus initialized")
-    model = Word2Vec(pmc_corpus, size=size, window=window, workers=4)
+    if d2v:
+        model = Doc2Vec(pmc_corpus, size=size, alpha=0.025, window=window, min_count=5, sample=0, seed=1,
+                                        workers=4, min_alpha=0.0001, dm=1, hs=1, negative=0, dm_mean=0,
+                                        train_words=True, train_lbls=True)
+        name = "pmc_d2v_%i_%i" % (size, window)
+    else:
+        model = Word2Vec(pmc_corpus, size=size, window=window, workers=4)
+        name = "pmc_%i_%i" % (size, window)
+
     logging.info("Model created")
     if isdir(dirname(filename)):
-        model_filename = join(dirname(filename), "pmc_%i_%i" % (size, window))
+            model_filename = join(dirname(filename), name)
     else:
-        model_filename = str("pmc_%i_%i" % (size, window))
+        model_filename = str(name)
+
     model.save(model_filename)
     logging.info("Model saved ins %s" % model_filename)
 
@@ -76,6 +92,7 @@ def __main__():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-w', action='store', dest='window', help='Window')
     parser.add_argument('-s', action='store', dest='size', help='Size')
+    parser.add_argument('--d2v', action='store_true', dest='d2v', help='Size')
 
     arguments = parser.parse_args()
 
@@ -86,7 +103,7 @@ def __main__():
     size = int(arguments.size)
     window = int(arguments.window)
     logging.info("creating model with size %s and window %s" % (size, window))
-    create_w2v_model(filename, size=size, window=window)
+    create_w2v_model(filename, size=size, window=window, d2v=arguments.d2v)
 
 
 if __name__ == "__main__":
