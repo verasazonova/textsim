@@ -5,9 +5,15 @@ import numpy as np
 import re
 import sklearn.naive_bayes
 import sklearn.utils
+from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
+from sklearn.cluster import DBSCAN, KMeans
+from sklearn.manifold import TSNE
+from sklearn.pipeline import make_pipeline
+from sklearn.feature_extraction.text import TfidfTransformer, HashingVectorizer, TfidfVectorizer
 from ttp import ttp
+import matplotlib.pyplot as plt
 
-def read_file(filename):
+def read_file_annotated(filename):
     with open(filename, 'r') as f:
         reader = csv.reader(f)
         x = []
@@ -16,6 +22,19 @@ def read_file(filename):
             x.append(row[2].decode('utf-8'))
             y.append(row[3])
     return x, y
+
+
+def read_file(filename):
+    with open(filename, 'r') as f:
+        reader = csv.reader(f)
+        x = []
+        labels = []
+        for row in reader:
+            str = unicode(row[1], errors='replace')
+            x.append(str)
+            str = unicode(row[15], errors='replace')
+            labels.append(str.replace(' ', '_').replace(',', ',_'))
+    return x, labels
 
 
 class MyParser(ttp.Parser):
@@ -44,16 +63,19 @@ class MyParser(ttp.Parser):
 
 class KenyanTweets():
     def __init__(self, filename):
-        self.data, self.target = read_file(filename)
+        self.data, self.labels = read_file(filename)
 
     def __iter__(self):
         p = MyParser()
         for text in self.data:
             result = p.parse(text)
-            yield re.sub(r'([,.?!])(?![\s.,!?])', r'\1 ', result.html).split()
+            yield re.sub(r'([,.?!])(?![\s.,!?])', r'\1 ', result.html)
 
-    def get_target(self):
-        return [1 if tweet_class == 'T' else 0 for tweet_class in self.target]
+    def get_labels(self):
+        return self.labels
+
+#    def get_target(self):
+#        return [1 if tweet_class == 'T' else 0 for tweet_class in self.target]
 
 def print_positives(kw):
 
@@ -81,16 +103,41 @@ def run_classifier(kw):
                                                                            verbose=2, n_jobs=1)
     return scores
 
+
+def run_clusterer(dataset):
+
+    hasher = HashingVectorizer(n_features=10000, stop_words='english', non_negative=True, norm=None, binary=False)
+    #clusterer = DBSCAN(eps=0.5, min_samples=5, metric='cosine', algorithm='auto', leaf_size=30, p=None,
+    #                             random_state=None)
+
+    clusterer = KMeans(n_clusters=5, init='k-means++', max_iter=100, n_init=1, verbose=1)
+
+    X = TfidfVectorizer().fit_transform(dataset)
+
+#    clf = make_pipeline(TfidfVectorizer(), clusterer)
+
+    #clusterer.fit(X)
+
+    #D = cosine_similarity(X)
+
+    #print D.shape
+
+    t = TSNE(n_components=2, init='pca', metric='euclidean')
+    model = t.fit_transform(X)
+    return model
+
 def __main__():
-    filename="gikomba_annotated.csv"
+    filename="makaburi.small.csv"
     #filename="mandera_annotated.csv"
     kw = KenyanTweets(filename)
-    print_positives(kw)
+    #print_positives(kw)
 
+    X = [tweet for tweet in kw]
+    X_2D = run_clusterer(X)
 
-    #for tweet, tweet_class in zip(kw, kw.get_target()):
-    #    if tweet_class == 1:
-    #        print tweet
+    with open("output.txt", 'w') as fout:
+        for row, label in zip(X_2D, kw.get_labels()):
+            print row[0], row[1], label
 
 
 if __name__ == "__main__":

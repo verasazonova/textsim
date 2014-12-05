@@ -70,7 +70,7 @@ def create_w2v_model(filename, size=100, window=8, d2v=False):
     if d2v:
         model = Doc2Vec(pmc_corpus, size=size, alpha=0.025, window=window, min_count=5, sample=0, seed=1,
                                         workers=4, min_alpha=0.0001, dm=1, hs=1, negative=0, dm_mean=0,
-                                        train_words=True, train_lbls=True)
+                                        train_words=True, train_lbls=False)
         name = "pmc_d2v_%i_%i" % (size, window)
     else:
         model = Word2Vec(pmc_corpus, size=size, window=window, workers=4)
