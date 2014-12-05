@@ -2,6 +2,7 @@ __author__ = 'verasazonova'
 
 import csv
 import numpy as np
+import argparse
 import re
 import sklearn.naive_bayes
 import sklearn.utils
@@ -127,7 +128,12 @@ def run_clusterer(dataset):
     return model
 
 def __main__():
-    filename="makaburi.small.csv"
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('-f', action='store', dest='filename', help='Filename')
+
+    arguments = parser.parse_args()
+
+    filename = arguments.filename
     #filename="mandera_annotated.csv"
     kw = KenyanTweets(filename)
     #print_positives(kw)
