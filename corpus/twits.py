@@ -6,13 +6,13 @@ import argparse
 import re
 import sklearn.naive_bayes
 import sklearn.utils
-from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
+#from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.manifold import TSNE
-from sklearn.pipeline import make_pipeline
+#from sklearn.pipeline import make_pipeline
 from sklearn.feature_extraction.text import TfidfTransformer, HashingVectorizer, TfidfVectorizer
 from ttp import ttp
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def read_file_annotated(filename):
     with open(filename, 'r') as f:
