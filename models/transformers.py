@@ -4,6 +4,8 @@ import logging
 from corpus.medical import word_valid
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.utils import check_random_state
 from gensim import corpora, models, matutils
 from gensim.models.doc2vec import LabeledSentence
 import re
@@ -17,6 +19,9 @@ class BOWModel(BaseEstimator, TransformerMixin):
 
 
     def fit(self, X, y=None):
+
+        X = [text.words for text in X]
+
         self.dictionary = corpora.Dictionary(X)
         self.dictionary.filter_extremes(no_above=self.no_above, no_below=self.no_below)
         self.bow = [self.dictionary.doc2bow(text) for text in X]
@@ -25,6 +30,7 @@ class BOWModel(BaseEstimator, TransformerMixin):
 
 
     def transform(self, X):
+        X = [text.words for text in X]
         x_tfidf = self.tfidf[[self.dictionary.doc2bow(text) for text in X]]
         x_data = matutils.corpus2dense(x_tfidf, num_terms=len(self.dictionary)).T
         logging.info("Returning data of shape %s " % (x_data.shape,))
@@ -36,18 +42,51 @@ def sents_to_labeled(X):
 
 
 class D2VModel(BaseEstimator, TransformerMixin):
-    def __init__(self, d2v_model=None):
+    def __init__(self, d2v_model=None, corpus=None, alpha=0.025, size=100, window=5, initial_w2v=None, min_count=5,
+                 min_alpha=0.0001, num_iters=1, sample=0, negative=0):
         self.d2v_model = d2v_model
+        self.corpus = corpus
+        self.alpha = alpha
+        self.min_alpha = min_alpha
+        self.size = size
+        self.window = window
+        self.min_count = min_count
+        self.initial_w2v = initial_w2v
+        self.num_iters = int(num_iters)
+        self.d2v_model2 = None
+        self.sample = sample
+        self.negative = negative
         logging.info("D2V")
 
 
     def fit(self, X, y=None):
-        logging.info("D2V: building a doc2vector model")
-        if self.d2v_model is None:
-            self.d2v_model = models.Doc2Vec(sentences=sents_to_labeled(X), size=50, alpha=0.025, window=8, min_count=3, sample=0, seed=1,
-                                        workers=4, min_alpha=0.0001, dm=1, hs=1, negative=0, dm_mean=0,
-                                        train_words=True, train_lbls=True)
-        logging.info("Model built %s " % (self.d2v_model, ))
+        logging.info("D2V: got a doc2vector model %s ", (self.d2v_model, ))
+        if self.d2v_model is None and self.corpus is not None:
+            logging.info("D2V: building a model with size %s, window %s, alpha %s on corpus %s" %
+                         (self.size, self.window, self.alpha, self.corpus))
+            self.d2v_model = models.Doc2Vec(sentences=self.corpus, size=self.size, alpha=self.alpha, window=self.window,
+                                            min_count=self.min_count, sample=self.sample, seed=1,
+                                            workers=4, min_alpha=self.min_alpha, dm=1, hs=1, negative=self.negative,
+                                            dm_mean=0,
+                                            train_words=True, train_lbls=False, initial=self.initial_w2v)
+
+            self.d2v_model.train_lbls = True
+            self.d2v_model.train_words = False
+            if self.num_iters == 1:
+                self.d2v_model.train(self.corpus)
+            else:
+                for i in range(0, self.num_iters+1):
+                    self.d2v_model.alpha = 0.025 * (self.num_iters - i) / self.num_iters + 0.0001 * i / self.num_iters
+                    self.d2v_model.min_alpha = self.d2v_model.alpha
+                    self.d2v_model.train(self.corpus)
+
+
+            #self.d2v_model2 = models.Doc2Vec(sentences=self.corpus, size=self.size, alpha=self.alpha, window=self.window,
+            #                                min_count=self.min_count, sample=0, seed=1,
+            #                                workers=4, min_alpha=self.min_alpha, dm=0, hs=1, negative=0, dm_mean=0,
+            #                                train_words=True, train_lbls=True, initial=self.initial_w2v)
+
+            logging.info("Model built %s " % (self.d2v_model, ))
         return self
 
 
@@ -55,17 +94,25 @@ class D2VModel(BaseEstimator, TransformerMixin):
         logging.info("D2V: pre-processing data of shape %s " % (X.shape, ))
         n_docs = len(X)
         if self.d2v_model is not None:
-            self.d2v_model.train_words = False
-            self.d2v_model.train(sents_to_labeled(X))
 
-            d2v_length = len(self.d2v_model['test'])
+            self.d2v_model.train_words = False
+            self.d2v_model.train_lbls = True
+            self.d2v_model.train(X)
+
+            d2v_length = self.d2v_model.layer1_size
             logging.info("D2V:  w2v-len %s " % (d2v_length, ))
-            data = np.zeros((n_docs, d2v_length))
+            if self.d2v_model2 is None:
+                data = np.zeros((n_docs, d2v_length))
+            else:
+                data = np.zeros((n_docs, 2*d2v_length))
 
             for doc_cnt, text in enumerate(X):
-                data[doc_cnt, :] = self.d2v_model[str(doc_cnt)]
+                if text.labels[0] in self.d2v_model:
+                    data[doc_cnt, 0:d2v_length] = self.d2v_model[text.labels[0]]
+                    if self.d2v_model2 is not None:
+                        data[doc_cnt, d2v_length:] = self.d2v_model2[text.labels[0]]
 
-            logging.info("W2V Stacked: returning pre-processed data of shape %s" % (data.shape, ))
+            logging.info("D2V: returning pre-processed data of shape %s" % (data.shape, ))
         else:
             data = np.zeros((n_docs, 1))
         print data
@@ -244,3 +291,131 @@ class LDAModel(BaseEstimator, TransformerMixin):
         bow_corpus = [self.dictionary.doc2bow(text) for text in X]
         x_data = matutils.corpus2dense(self.model[bow_corpus], num_terms=len(self.dictionary)).T
         return x_data
+
+
+
+class W2VList(BaseEstimator, TransformerMixin):
+
+    def __init__(self, w2v_model=None):
+        self.w2v_model = w2v_model
+
+
+    def fit(self, X):
+        return self
+
+    def transform(self, X):
+        n_docs = len(X)
+        data = []
+        if self.w2v_model is None:
+            raise Exception("No word2vec model provided")
+
+        for doc_cnt, text in enumerate(X):
+            cnt = 0
+            vector_list = []
+            for word in text:
+                if word in self.w2v_model:
+                    vector_list.append( self.w2v_model[word] )
+                else:
+                    #vector_list.append( np.ones(self.w2v_model.layer1_size, ))
+                    vector_list.append( self.w2v_model['test'])
+            data.append(vector_list)
+        return data
+
+
+
+class CRPClusterer(BaseEstimator, TransformerMixin):
+
+    def __init__(self, random_state=None):
+        self.random_state = random_state
+
+    def fit(self, X):
+        self.random_state_ = check_random_state(self.random_state)
+        return self
+
+
+    # X: an array of real vectors
+    def transform(self, X):
+        clusters = []
+        for vecs in X:
+            #clusterVec = [np.zeros(vecs[0].shape,)]         # tracks sum of vectors in a cluster
+            #clusterIdx = [[0]]         # array of index arrays. e.g. [[1, 3, 5], [2, 4, 6]]
+            clusterVec = []
+            clusterIdx = []
+            ncluster = 0
+            # probablity to create a new table if new customer
+            # is not strongly "similar" to any existing table
+            pnew = 1.0/ (1 + ncluster)
+            N = len(vecs)
+            rands = self.random_state_.rand(N)
+            #rands = rands / np.max(rands)
+
+            for i, v in enumerate(vecs):
+                maxSim = -np.inf
+                maxIdx = 0
+                #v = vecs[i]
+                for j in range(ncluster):
+                    sim = cosine_similarity(v, clusterVec[j])[0][0]
+                    if sim >= maxSim:
+                        maxIdx = j
+                        maxSim = sim
+                if maxSim < pnew:
+                    if rands[i] < pnew:
+                        clusterVec.append(v)
+                        clusterIdx.append([i])
+                        ncluster += 1
+                        pnew = 1.0 / (1 + ncluster)
+                    continue
+                clusterVec[maxIdx] = clusterVec[maxIdx] + v
+                clusterIdx[maxIdx].append(i)
+            clusters.append(clusterIdx)
+        return clusters
+
+
+
+class CRPW2VClusterer(BaseEstimator, TransformerMixin):
+
+    def __init__(self, random_state=None, w2v_model=None):
+        self.random_state = random_state
+        self.model = w2v_model
+
+    def fit(self, X):
+        self.random_state_ = check_random_state(self.random_state)
+        return self
+
+
+    # X: an array of real vectors
+    def transform(self, X):
+        clusters = []
+        for text in X:
+            #clusterVec = [np.zeros(vecs[0].shape,)]         # tracks sum of vectors in a cluster
+            #clusterIdx = [[0]]         # array of index arrays. e.g. [[1, 3, 5], [2, 4, 6]]
+            clusterVec = []
+            clusterIdx = []
+            ncluster = 0
+            # probablity to create a new table if new customer
+            # is not strongly "similar" to any existing table
+            pnew = 1.0/ (1 + ncluster)
+            N = len(text)
+            rands = self.random_state_.rand(N)
+            #rands = rands / np.max(rands)
+
+            for i, word in enumerate(text):
+                maxSim = -np.inf
+                maxIdx = 0
+                #v = vecs[i]
+                for j in range(ncluster):
+                    sim = self.model.similarity(word, clusterVec[j])
+                    if sim >= maxSim:
+                        maxIdx = j
+                        maxSim = sim
+                if maxSim < pnew:
+                    if rands[i] < pnew:
+                        clusterVec.append(v)
+                        clusterIdx.append([i])
+                        ncluster += 1
+                        pnew = 1.0 / (1 + ncluster)
+                    continue
+                clusterVec[maxIdx] = clusterVec[maxIdx] + v
+                clusterIdx[maxIdx].append(i)
+            clusters.append(clusterIdx)
+        return clusters

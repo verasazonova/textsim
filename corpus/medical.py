@@ -17,6 +17,7 @@ from gensim.models.doc2vec import LabeledSentence
 def readarticles(filename, article_fields):
     article_list = []
     article_dict = {}
+    dataset = os.path.basename(filename).split('.')[0].split('_')[1]
     with open(filename, 'r') as f:
         for line in f:
             # print line
@@ -25,12 +26,13 @@ def readarticles(filename, article_fields):
                 if not (article_dict == {}):
                     article_list.append(article_dict)
                     # reinitialize the out string
-                article_dict = {'id': m.group(1)}
+                article_dict = {'id': dataset  + "_" +m.group(1) }
             else:
                 m = re.search('----([K|T|A|P|M]) (.+)', line.strip())
                 if m:
                     # if one of the valid options
                     if m.group(1) == 'K':
+                        # the full id of the article is the filename joined by the id of the article
                         article_dict['class'] = m.group(2)
                     if m.group(1) in article_fields:
                         # if in the middle of the article, and the fields are one of the valid ones -
@@ -58,14 +60,14 @@ else:
 #    stop = set(['a', 'the'])
 
 def word_valid(word):
-    if (word in stop) or len(word) < 2 or re.match('\d+([,.]\d)*', word) or re.match(r".*\\.*", word) \
-            or re.match(r"\W+", word):
+    if (word in stop) or len(word) < 2: #or re.match('\d+([,.]\d)*', word) or re.match(r".*\\.*", word) \
+            #or re.match(r"\W+", word):
         return False
     return True
 
 
 def word_tokenize(text):
-    tokens = [word.translate(None, '!?.,;:\'\"') for word in text.translate(None, '()[]').lower().split() if
+    tokens = [unicode(word.translate(None, '!?.,;:\'\"'), errors='replace') for word in text.translate(None, '()[]').lower().split() if
               word_valid(word)]
     return tokens
 
@@ -103,24 +105,39 @@ class AugmentedCorpus:
             print "you must iterated the class first"
 
 class MedicalReviewAbstracts:
-    def __init__(self, filename, article_fields):
+    def __init__(self, filename, article_fields, labeled=True, tokenize=True):
         self.articles = readarticles(filename, article_fields)
         self.dataset = os.path.basename(filename)
+        self.article_fields = article_fields
+        self.labeled = labeled
+        self.tokenize = tokenize
+
 
     def __iter__(self):
         for article in self.articles:
-            text_tokens = []
-            mesh_tokens = []
-            if ('T' in article) and ('A' in article):
-                text_tokens = word_tokenize(article['T'] + article['A'])
-            elif 'A' in article:
-                text_tokens = word_tokenize(article['A'])
-            elif 'T' in article:
-                text_tokens = word_tokenize(article['T'])
+            if self.tokenize:
+                text_tokens = []
+                mesh_tokens = []
+                if ('T' in article) and ('A' in article):
+                    text_tokens = word_tokenize(article['T'] + article['A'])
+                elif 'A' in article:
+                    text_tokens = word_tokenize(article['A'])
+                elif 'T' in article:
+                    text_tokens = word_tokenize(article['T'])
 
-            if 'M' in article:
-                mesh_tokens = mesh_tokenize(article['M'])
-            yield text_tokens + mesh_tokens
+                if 'M' in article:
+                    mesh_tokens = mesh_tokenize(article['M'])
+            else:
+                text_tokens = ""
+                mesh_tokens = ""
+                for key in self.article_fields:
+                    if key in article:
+                        text_tokens += article[key]
+
+            if self.labeled:
+                yield LabeledSentence( text_tokens + mesh_tokens, [article['id']] )
+            else:
+                yield text_tokens + mesh_tokens
 
     def get_target(self):
         return [1 if article['class'] == 'I' else 0 for article in self.articles]
@@ -134,25 +151,6 @@ class MedicalReviewAbstracts:
         #print "Dataset, Percent positives, # positives, # total: "
         return self.dataset, n_pos*100.0 / n, n_pos, n
 
-
-
-class LabeledMedicalReviewAbstracts(MedicalReviewAbstracts):
-
-    def __iter__(self):
-        for article in self.articles:
-            text_tokens = []
-            mesh_tokens = []
-            if ('T' in article) and ('A' in article):
-                text_tokens = word_tokenize(article['T'] + article['A'])
-            elif 'A' in article:
-                text_tokens = word_tokenize(article['A'])
-            elif 'T' in article:
-                text_tokens = word_tokenize(article['T'])
-
-            if 'M' in article:
-                mesh_tokens = mesh_tokenize(article['M'])
-
-            yield LabeledSentence( text_tokens + mesh_tokens, [article['id']] )
 
 
 
@@ -201,7 +199,7 @@ def __main__():
     datasets, filenames = prep_arguments(arguments)
     for filename in filenames:
 #        print filename
-        mra = LabeledMedicalReviewAbstracts(filename, ['T', 'A'])
+        mra = MedicalReviewAbstracts(filename, ['T', 'A'], labeled=True, tokenize=False)
 #        print_stats(mra)
         for article in mra:
             print article

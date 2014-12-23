@@ -25,14 +25,18 @@ def Hbeta(D=Math.array([]), beta=1.0):
     return H, P;
 
 
-def x2p(X=Math.array([]), tol=1e-5, perplexity=30.0):
+def x2p(X=Math.array([]), tol=1e-5, perplexity=30.0, distances=False):
     """Performs a binary search to get P-values in such a way that each conditional Gaussian has the same perplexity."""
 
     # Initialize some variables
-    print "Computing pairwise distances..."
-    (n, d) = X.shape;
-    sum_X = Math.sum(Math.square(X), 1);
-    D = Math.add(Math.add(-2 * Math.dot(X, X.T), sum_X).T, sum_X);
+    if not distances:
+        print "Computing pairwise distances..."
+        (n, d) = X.shape;
+        sum_X = Math.sum(Math.square(X), 1);
+        D = Math.add(Math.add(-2 * Math.dot(X, X.T), sum_X).T, sum_X);
+    else:
+        D = X
+        n = X.shape[0]
     P = Math.zeros((n, n));
     beta = Math.ones((n, 1));
     logU = Math.log(perplexity);
@@ -93,7 +97,7 @@ def pca(X=Math.array([]), no_dims=50):
     return Y;
 
 
-def tsne(X=Math.array([]), no_dims=2, initial_dims=50, perplexity=30.0, coords=True):
+def tsne(X=Math.array([]), no_dims=2, initial_dims=50, perplexity=30.0, coords=True, perform_pca=True):
     """Runs t-SNE on the dataset in the NxD array X to reduce its dimensionality to no_dims dimensions.
     The syntaxis of the function is Y = tsne.tsne(X, no_dims, perplexity), where X is an NxD NumPy array."""
 
@@ -109,10 +113,12 @@ def tsne(X=Math.array([]), no_dims=2, initial_dims=50, perplexity=30.0, coords=T
     # Initialize variables
     if coords:
         print "Coordinates provided.  Reducing with pca and transforming to probabilities"
-        X = pca(X, initial_dims)
-        P = x2p(X, 1e-5, perplexity);
+        if perform_pca:
+            X = pca(X, initial_dims)
+        P = x2p(X, 1e-5, perplexity, distances=False)
     else:
         print "Probabilities provided"
+        #P = x2p(X, 1e-5, perplexity, distances=True)
         P = X
 
     P = P + Math.transpose(P);

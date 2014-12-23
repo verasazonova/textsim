@@ -6,13 +6,15 @@ import argparse
 import re
 import sklearn.naive_bayes
 import sklearn.utils
-#from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
+from sklearn.metrics.pairwise import cosine_similarity, cosine_distances
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.manifold import TSNE
+from utils import tsne
 #from sklearn.pipeline import make_pipeline
 from sklearn.feature_extraction.text import TfidfTransformer, HashingVectorizer, TfidfVectorizer
 from ttp import ttp
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+from models.transformers import D2VModel
 
 def read_file_annotated(filename):
     with open(filename, 'r') as f:
@@ -113,18 +115,26 @@ def run_clusterer(dataset):
 
     clusterer = KMeans(n_clusters=5, init='k-means++', max_iter=100, n_init=1, verbose=1)
 
-    X = TfidfVectorizer().fit_transform(dataset)
+    #X = TfidfVectorizer().fit_transform(dataset)
 
 #    clf = make_pipeline(TfidfVectorizer(), clusterer)
 
     #clusterer.fit(X)
 
     #D = cosine_similarity(X)
-
+    #D = cosine_distances(X)
     #print D.shape
 
-    t = TSNE(n_components=2, init='pca', metric='euclidean')
-    model = t.fit_transform(X)
+    X2 = D2VModel().fit_transform(np.array(dataset))
+
+    print X2
+
+    t = TSNE(n_components=2, init='random', metric='euclidean')
+
+    model = t.fit_transform(X2)
+
+    #model2 = tsne.tsne(X, coords=True)
+
     return model
 
 def __main__():
@@ -144,6 +154,9 @@ def __main__():
     with open("output.txt", 'w') as fout:
         for row, label in zip(X_2D, kw.get_labels()):
             print row[0], row[1], label
+
+    plt.scatter(X_2D[:, 0], X_2D[:, 1])
+    plt.savefig(filename+".pdf")
 
 
 

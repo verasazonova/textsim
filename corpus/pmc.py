@@ -1,16 +1,13 @@
 __author__ = 'verasazonova'
 
 
-import argparse
 import xml.etree.ElementTree as ET
 import re
 from os import listdir
-from os.path import isfile, isdir, join, dirname
+from os.path import isfile, isdir, join
 import codecs
 from corpus.medical import sent_tokenize, word_tokenize
-from gensim.models import Word2Vec, Doc2Vec
 from gensim.models.doc2vec import LabeledSentence
-import logging
 
 def remove_latex(s):
     return re.sub('\\\(.*)(\[.*\])*(\{.*\})*', '', s).strip()
@@ -64,47 +61,3 @@ class PubMedCentralOpenSubset():
                             yield current_sent
 
 
-def create_w2v_model(filename, size=100, window=8, d2v=False):
-    pmc_corpus = PubMedCentralOpenSubset(filename)
-    logging.info("Corpus initialized")
-    if d2v:
-        model = Doc2Vec(pmc_corpus, size=size, alpha=0.025, window=window, min_count=5, sample=0, seed=1,
-                                        workers=4, min_alpha=0.0001, dm=1, hs=1, negative=0, dm_mean=0,
-                                        train_words=True, train_lbls=False)
-        name = "pmc_d2v_%i_%i" % (size, window)
-    else:
-        model = Word2Vec(pmc_corpus, size=size, window=window, workers=4)
-        name = "pmc_%i_%i" % (size, window)
-
-    logging.info("Model created")
-    if isdir(dirname(filename)):
-            model_filename = join(dirname(filename), name)
-    else:
-        model_filename = str(name)
-
-    model.save(model_filename)
-    logging.info("Model saved ins %s" % model_filename)
-
-
-def __main__():
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-w', action='store', dest='window', help='Window')
-    parser.add_argument('-s', action='store', dest='size', help='Size')
-    parser.add_argument('--d2v', action='store_true', dest='d2v', help='Size')
-
-    arguments = parser.parse_args()
-
-    path = "/Users/verasazonova/no-backup/pubmed_central/"
-    #construct_pmc(path)
-
-    filename = join(path, "pmc_corpus_TA.txt")
-    size = int(arguments.size)
-    window = int(arguments.window)
-    logging.info("creating model with size %s and window %s" % (size, window))
-    create_w2v_model(filename, size=size, window=window, d2v=arguments.d2v)
-
-
-if __name__ == "__main__":
-    __main__()
