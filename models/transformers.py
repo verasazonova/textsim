@@ -5,10 +5,11 @@ from corpus.medical import word_valid
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.utils import check_random_state
+from sklearn.utils import check_random_state, shuffle
 from gensim import corpora, models, matutils
 from gensim.models.doc2vec import LabeledSentence
 import re
+from sklearn import preprocessing
 
 
 class BOWModel(BaseEstimator, TransformerMixin):
@@ -41,9 +42,33 @@ def sents_to_labeled(X):
     return [LabeledSentence(text, [str(cnt)]) for cnt, text in enumerate(X)]
 
 
+
+def train_model(model, num_iters, X, train_type):
+    alpha = model.alpha
+    min_alpha = model.min_alpha
+    if num_iters == 1:
+        model.train(X)
+    else:
+        X1 = [x for x in X]
+        #inc = 0.002
+        inc = (model.alpha - model.min_alpha) / (num_iters)
+        print len(X1), inc, model, num_iters
+        for i in range(0, num_iters+1):
+            print model.alpha
+            if train_type == "fixed":
+                model.min_alpha = model.alpha
+                model.train(shuffle(X1, random_state=i))
+                model.alpha -=  inc
+            else:
+                model.alpha = alpha
+                model.train(shuffle(X1, random_state=i))
+        model.alpha = alpha
+        model.min_alpha = min_alpha
+
 class D2VModel(BaseEstimator, TransformerMixin):
-    def __init__(self, d2v_model=None, corpus=None, alpha=0.025, size=100, window=5, initial_w2v=None, min_count=5,
-                 min_alpha=0.0001, num_iters=1, sample=0, negative=0):
+    def __init__(self, d2v_model=None, corpus=None, alpha=0.05, size=100, window=5, initial_w2v=None, min_count=5,
+                 min_alpha=0.0001, num_iters=1, sample=0, negative=0, two_models=True, dm=1, hs=1, seed=0,
+                 num_iters_words=1, train_type="fixed", alpha_words=None):
         self.d2v_model = d2v_model
         self.corpus = corpus
         self.alpha = alpha
@@ -56,6 +81,19 @@ class D2VModel(BaseEstimator, TransformerMixin):
         self.d2v_model2 = None
         self.sample = sample
         self.negative = negative
+        self.hs = hs
+        self.dm = dm
+        self.seed = seed
+        self.train_type = type
+        if num_iters_words is None:
+            self.num_iters_words = self.num_iters
+        else:
+            self.num_iters_words = num_iters_words
+        if alpha_words is None:
+            self.alpha_words = self.alpha
+        else:
+            self.alpha_words = alpha_words
+        self.two_models = two_models
         logging.info("D2V")
 
 
@@ -64,29 +102,40 @@ class D2VModel(BaseEstimator, TransformerMixin):
         if self.d2v_model is None and self.corpus is not None:
             logging.info("D2V: building a model with size %s, window %s, alpha %s on corpus %s" %
                          (self.size, self.window, self.alpha, self.corpus))
-            self.d2v_model = models.Doc2Vec(sentences=self.corpus, size=self.size, alpha=self.alpha, window=self.window,
-                                            min_count=self.min_count, sample=self.sample, seed=1,
-                                            workers=4, min_alpha=self.min_alpha, dm=1, hs=1, negative=self.negative,
+            self.d2v_model = models.Doc2Vec(sentences=None, size=self.size, alpha=self.alpha, window=self.window,
+                                            min_count=self.min_count, sample=self.sample, seed=self.seed,
+                                            workers=4, min_alpha=self.min_alpha, dm=self.dm, hs=self.hs,
+                                            negative=self.negative,
                                             dm_mean=0,
                                             train_words=True, train_lbls=False, initial=self.initial_w2v)
 
-            self.d2v_model.train_lbls = True
-            self.d2v_model.train_words = False
-            if self.num_iters == 1:
-                self.d2v_model.train(self.corpus)
-            else:
-                for i in range(0, self.num_iters+1):
-                    self.d2v_model.alpha = 0.025 * (self.num_iters - i) / self.num_iters + 0.0001 * i / self.num_iters
-                    self.d2v_model.min_alpha = self.d2v_model.alpha
-                    self.d2v_model.train(self.corpus)
+            self.d2v_model.build_vocab(self.corpus)
 
+            '''
+            Train words
+            '''
+            self.d2v_model.train_words = True
+            self.d2v_model.train_lbls = False
+            self.d2v_model.alpha = self.alpha_words
+            train_model(self.d2v_model, self.num_iters_words, self.corpus, self.train_type)
 
-            #self.d2v_model2 = models.Doc2Vec(sentences=self.corpus, size=self.size, alpha=self.alpha, window=self.window,
-            #                                min_count=self.min_count, sample=0, seed=1,
-            #                                workers=4, min_alpha=self.min_alpha, dm=0, hs=1, negative=0, dm_mean=0,
-            #                                train_words=True, train_lbls=True, initial=self.initial_w2v)
+            if self.two_models:
+                self.d2v_model2 = models.Doc2Vec(sentences=None, size=self.size, alpha=self.alpha, window=self.window,
+                                                min_count=self.min_count, sample=self.sample, seed=self.seed,
+                                                workers=4, min_alpha=self.min_alpha, dm=abs(1-self.dm), hs=self.hs,
+                                                negative=self.negative,
+                                                dm_mean=0,
+                                                train_words=True, train_lbls=False, initial=self.initial_w2v)
 
-            logging.info("Model built %s " % (self.d2v_model, ))
+                self.d2v_model2.build_vocab(self.corpus)
+
+                self.d2v_model2.train_words = True
+                self.d2v_model2.train_lbls = False
+                self.d2v_model2.alpha = self.alpha_words
+                train_model(self.d2v_model2, self.num_iters_words, self.corpus, self.train_type)
+
+            logging.info("Model 2 built %s " % (self.d2v_model2, ))
+        print "Fitted"
         return self
 
 
@@ -95,9 +144,19 @@ class D2VModel(BaseEstimator, TransformerMixin):
         n_docs = len(X)
         if self.d2v_model is not None:
 
+            '''
+            Train sentences
+            '''
             self.d2v_model.train_words = False
             self.d2v_model.train_lbls = True
-            self.d2v_model.train(X)
+            self.d2v_model.alpha = self.alpha
+            train_model(self.d2v_model, self.num_iters, X, self.train_type)
+
+            if self.d2v_model2 is not None:
+                self.d2v_model2.train_words = False
+                self.d2v_model2.train_lbls = True
+                self.d2v_model2.alpha = self.alpha
+                train_model(self.d2v_model2, self.num_iters, X, self.train_type)
 
             d2v_length = self.d2v_model.layer1_size
             logging.info("D2V:  w2v-len %s " % (d2v_length, ))
@@ -115,9 +174,22 @@ class D2VModel(BaseEstimator, TransformerMixin):
             logging.info("D2V: returning pre-processed data of shape %s" % (data.shape, ))
         else:
             data = np.zeros((n_docs, 1))
-        print data
-        return data
+        print "Transformed"
+        return preprocessing.normalize(data)
 
+
+class ReadVectorsModel(BaseEstimator, TransformerMixin):
+
+    def __init__(self, filename):
+        data = np.loadtxt(filename)
+        self.labels = data[:, 0]
+        self.vectors = data[:, 1:]
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        return self.vectors
 
 class W2VStackedModel(BaseEstimator, TransformerMixin):
 
@@ -289,7 +361,7 @@ class LDAModel(BaseEstimator, TransformerMixin):
     def transform(self, X):
 
         bow_corpus = [self.dictionary.doc2bow(text) for text in X]
-        x_data = matutils.corpus2dense(self.model[bow_corpus], num_terms=len(self.dictionary)).T
+        x_data = matutils.corpus2dense(self.model[bow_corpus], num_terms=self.topn).T
         return x_data
 
 

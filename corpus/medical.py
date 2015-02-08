@@ -105,9 +105,14 @@ class AugmentedCorpus:
             print "you must iterated the class first"
 
 class MedicalReviewAbstracts:
-    def __init__(self, filename, article_fields, labeled=True, tokenize=True):
-        self.articles = readarticles(filename, article_fields)
-        self.dataset = os.path.basename(filename)
+    def __init__(self, filenames, article_fields, labeled=True, tokenize=True):
+        if type(filenames) is not list:
+            filenames = [filenames]
+        print filenames
+        self.articles = []
+        for file in filenames:
+            self.articles += readarticles(file, article_fields)
+        #self.dataset = os.path.basename(filename)
         self.article_fields = article_fields
         self.labeled = labeled
         self.tokenize = tokenize
@@ -140,7 +145,7 @@ class MedicalReviewAbstracts:
                 yield text_tokens + mesh_tokens
 
     def get_target(self):
-        return [1 if article['class'] == 'I' else 0 for article in self.articles]
+        return [1 if article['class'] == 'I' else -1 for article in self.articles]
 
 
     def print_statistics(self):
@@ -197,12 +202,10 @@ def __main__():
     arguments = parser.parse_args()
 
     datasets, filenames = prep_arguments(arguments)
-    for filename in filenames:
-#        print filename
-        mra = MedicalReviewAbstracts(filename, ['T', 'A'], labeled=True, tokenize=False)
+    mra = MedicalReviewAbstracts(filenames, ['T', 'A'], labeled=True, tokenize=False)
 #        print_stats(mra)
-        for article in mra:
-            print article
+    for article in mra:
+        print article
 
 if __name__ == "__main__":
     __main__()

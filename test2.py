@@ -37,8 +37,8 @@ def run_grid_search(x, y, clf=None, parameters=None, fit_parameters=None):
     return grid_clf.best_score_
 
 def run_cv_classifier(x, y, clf=None):
-    n_trials = 50
-    n_cv = 2
+    n_trials = 10
+    n_cv = 3
     scores = np.zeros((n_trials * n_cv))
     for n in range(n_trials):
         logging.info("Testing: trial %i or %i" % (n, n_trials))
@@ -140,9 +140,9 @@ def test_one_file(dataset, model, model_type, clf, parameters_clf, d2v_corpus=No
 
         clf_pipeline = Pipeline([
             ('features', FeatureUnion([
-                ('d2v', D2VModel(d2v_model=None, corpus=d2v_corpus, alpha=0.025, size=100, window=5, min_count=8,
-                             min_alpha=0.0001, num_iters=1, initial_w2v=model)),
-                ('bow', BOWModel(no_below=2, no_above=0.9))
+                ('d2v', D2VModel(d2v_model=None, corpus=d2v_corpus, alpha=0.025, size=300, window=10, min_count=5,
+                             min_alpha=0.0001, num_iters=10, initial_w2v=model))
+                #('bow', BOWModel(no_below=2, no_above=0.9))
                 ])),
             ('clf', clf) ])
 
@@ -240,10 +240,10 @@ def __main__():
     for dataset in arguments.datasets:
         for topn in topns:
             print dataset, topn, model_type
-            #baseline = test_one_file(dataset, w2v_model, 'bow', clf, parameters, d2v_corpus=corpus)
+            baseline = test_one_file(dataset, w2v_model, 'bow', clf, parameters, d2v_corpus=corpus)
             new = test_one_file(dataset, w2v_model, model_type, clf, parameters, d2v_corpus=corpus,
                                 run_type=arguments.cls_type)
-            #print "%s: %s; bow %s" % (model_type, new, baseline)
+            print "%s: %s; bow %s" % (model_type, new, baseline)
 
 if __name__ == "__main__":
     __main__()

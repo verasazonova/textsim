@@ -13,8 +13,8 @@ def create_vector_model(corpus, output_dir=None, size=100, window=8, d2v=False, 
     if d2v:
         model = Doc2Vec(corpus, size=size, alpha=0.025, window=window, min_count=5, sample=0, seed=1,
                                         workers=4, min_alpha=0.0001, dm=1, hs=1, negative=0, dm_mean=0,
-                                        train_words=True, train_lbls=train_docs, initial=w2v_model)
-        name = "doc2vector_models/pmc_d2v_%i_%i" % (size, window)
+                                        train_words=False, train_lbls=True, initial=w2v_model)
+        name = "doc2vector_models/medab_all_d2v_%i_%i" % (size, window)
 
     else:
         model = Word2Vec(corpus, size=size, window=window, workers=4)
@@ -47,7 +47,7 @@ def __main__():
     parser.add_argument('-w', action='store', dest='window', help='Window')
     parser.add_argument('-s', action='store', dest='size', help='Size')
     parser.add_argument('--d2v', action='store_true', dest='d2v', help='Size')
-    parser.add_argument('-f', action='store', dest='filename', help='Filename of the corpus')
+    parser.add_argument('-f', action='store', nargs="+", dest='filename', help='Filename of the corpus')
     parser.add_argument('--type', action='store', dest='type', default='pmc', help='Corpus type: pmc or medab')
     parser.add_argument('--model', action='store', dest='w2v_model', default='None', help='W2V model to initialize')
 
@@ -60,7 +60,7 @@ def __main__():
         size = int(arguments.size)
         window = int(arguments.window)
         corpus_path = "/Users/verasazonova/no-backup/pubmed_central/"
-        filename = join(corpus_path, arguments.filename)
+        filename = join(corpus_path, arguments.filename[0])
         corpus = PubMedCentralOpenSubset(filename, labeled=arguments.d2v)
         train_docs = False # non need to train docs in the unlabeled dataset
 
@@ -68,8 +68,11 @@ def __main__():
         size = int(arguments.size)
         window = int(arguments.window)
         corpus_path = "/Users/verasazonova/no-backup/medab_data/"
-        filename = join(corpus_path, arguments.filename)
-        corpus = MedicalReviewAbstracts(filename, ['T', 'A'], labeled=arguments.d2v, tokenize=True)
+        prefix = "units_"
+        suffix = ".txt"
+        filenames = [ join(corpus_path, prefix+filename+suffix) for filename in arguments.filename]
+        print filenames
+        corpus = MedicalReviewAbstracts(filenames, ['T', 'A'], labeled=arguments.d2v, tokenize=True)
         train_docs = True # train docs, as we will use these later.
 
     else:
