@@ -7,10 +7,11 @@ import numpy as np
 from sklearn import linear_model, metrics, grid_search, svm
 from models.transformers import D2VModel, BOWModel, ReadVectorsModel
 from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.svm import SVC
 
 def normalize(phrase, min_count):
-    norm_phrase = phrase.lower()
-    for punctuation in [',', ':', '.', '(', ')', '!', '?', ':', ';', '/', '\"', '\'', '^']:
+    norm_phrase = phrase.lower().replace('<br>', ' ').replace('<br \/', ' ')
+    for punctuation in [',', ':', '.', '(', ')', '!', '?', ':', ';', '/', '\"', '*', '^']:
         norm_phrase = norm_phrase.replace(punctuation, punctuation+' ')
     data = norm_phrase.split(' ')
     data_length = len(data)
@@ -19,16 +20,22 @@ def normalize(phrase, min_count):
     return data
 
 
+def normalize_label(label):
+    return str(label)
+#   return "_*"+str(label)
+
 class IMDBCorpus:
     def __init__(self, filename, min_count):
         self.filename = filename
         self.min_count =  min_count
 
+
     def __iter__(self):
+
         with open(self.filename, 'r') as f:
             cnt = 0
             for line in f:
-                yield LabeledSentence(normalize(line, self.min_count), ["_*" + str(cnt)])
+                yield LabeledSentence(normalize(line, self.min_count), [normalize_label(cnt)])
                 cnt += 1
 
     def get_train(self):
@@ -36,7 +43,7 @@ class IMDBCorpus:
             cnt = 0
             for line in f:
                 if cnt < 25000:
-                    yield LabeledSentence(normalize(line, self.min_count), ["_*" + str(cnt)])
+                    yield LabeledSentence(normalize(line, self.min_count), [normalize_label(cnt)])
                 cnt += 1
 
 
@@ -45,7 +52,7 @@ class IMDBCorpus:
             cnt = 0
             for line in f:
                 if cnt >= 25000 and cnt < 50000:
-                    yield LabeledSentence(normalize(line, self.min_count), ["_*" + str(cnt)])
+                    yield LabeledSentence(normalize(line, self.min_count), [normalize_label(cnt)])
                 cnt += 1
 
     def get_target_train(self):
@@ -317,24 +324,24 @@ def __main__():
     #vectors = data[:, 1:]
 
 
-    clf = linear_model.LogisticRegression(C=100)
-
+    clf = linear_model.LogisticRegression(C=1)
+    #clf = SVC(C=50.0, gamma=.01, kernel='rbf')
     #clf = svm.SVC(C=10)
 
     clf_pipeline = Pipeline([
         ('features', FeatureUnion([
-            ('d2v', D2VModel(d2v_model=None, corpus=corpus, alpha=0.05, size=400, window=10, min_count=1,
-                             min_alpha=0.0001, num_iters=20, initial_w2v=None, two_models=True, negative=5,
-                             sample=0.0001, hs=0, dm=0, seed=0, num_iters_words=None, alpha_words=None,
-                             train_type="fixed")),
-            #('d2v', ReadVectorsModel("sentence_vectors.txt")),
+            #('d2v', D2VModel(d2v_model=None, corpus=corpus, alpha=0.05, size=400, window=10, min_count=1,
+#                             min_alpha=0.0001, num_iters=20, initial_w2v=None, two_models=True, negative=5,
+#                             sample=0.0001, hs=0, dm=0, seed=0, num_iters_words=None, alpha_words=None,
+#                             train_type="decreasing")),
+            ('d2v', ReadVectorsModel(arguments.vectors))
             #('bow', BOWModel(no_below=2, no_above=0.9))
                 ])),
         ('clf', clf) ])
 
     parameters = {
-#                   'features__d2v__num_iters': [10, 20],
-                   'features__d2v__alpha': [0.025, 0.05, 0.1]
+                   'features__d2v__num_iters': [5, 10, 20],
+#                   'features__d2v__alpha': [0.05, 0.1],
 #                   'features__d2v__train_type': ["fixed", "decreasing"]
                    }
 
@@ -351,13 +358,15 @@ def __main__():
 
     print x_dev.shape, y_dev.shape
 
-    #grid_clf.fit(x_dev, y_dev)
+
+#    grid_clf.fit(x_dev, y_dev)
 
 #    print grid_clf.grid_scores_
-##    print grid_clf.best_params_
+#    print grid_clf.best_params_
 #    print grid_clf.best_score_
 
 #    best_clf = grid_clf.best_estimator_
+
     best_clf = clf_pipeline
 
     x_train = np.array([text for text in corpus.get_train()])

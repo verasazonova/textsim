@@ -11,7 +11,9 @@ from gensim.models.doc2vec import LabeledSentence
 import re
 from sklearn import preprocessing
 
-
+'''
+sklearn-compatible BOW-gensim model
+'''
 class BOWModel(BaseEstimator, TransformerMixin):
     def __init__(self, no_below=2, no_above=0.9):
         self.no_below = no_below
@@ -46,18 +48,18 @@ def sents_to_labeled(X):
 def train_model(model, num_iters, X, train_type):
     alpha = model.alpha
     min_alpha = model.min_alpha
-    if num_iters == 1:
+    if int(num_iters) == 1:
         model.train(X)
     else:
         X1 = [x for x in X]
         #inc = 0.002
         inc = (model.alpha - model.min_alpha) / (num_iters)
-        print len(X1), inc, model, num_iters
-        for i in range(0, num_iters+1):
+        print len(X1), inc, model, num_iters, train_type
+        for i in range(0, int(num_iters)+1):
             print model.alpha
             if train_type == "fixed":
                 model.min_alpha = model.alpha
-                model.train(shuffle(X1, random_state=i))
+                model.train(X1) #shuffle(X1, random_state=i))
                 model.alpha -=  inc
             else:
                 model.alpha = alpha
@@ -65,6 +67,10 @@ def train_model(model, num_iters, X, train_type):
         model.alpha = alpha
         model.min_alpha = min_alpha
 
+
+'''
+sklearn-compatible D2V-gensim model
+'''
 class D2VModel(BaseEstimator, TransformerMixin):
     def __init__(self, d2v_model=None, corpus=None, alpha=0.05, size=100, window=5, initial_w2v=None, min_count=5,
                  min_alpha=0.0001, num_iters=1, sample=0, negative=0, two_models=True, dm=1, hs=1, seed=0,
@@ -77,28 +83,31 @@ class D2VModel(BaseEstimator, TransformerMixin):
         self.window = window
         self.min_count = min_count
         self.initial_w2v = initial_w2v
-        self.num_iters = int(num_iters)
+        self.num_iters = num_iters
         self.d2v_model2 = None
         self.sample = sample
         self.negative = negative
         self.hs = hs
         self.dm = dm
         self.seed = seed
-        self.train_type = type
-        if num_iters_words is None:
-            self.num_iters_words = self.num_iters
-        else:
-            self.num_iters_words = num_iters_words
-        if alpha_words is None:
-            self.alpha_words = self.alpha
-        else:
-            self.alpha_words = alpha_words
+        self.train_type = train_type
+        self.num_iters_words = num_iters_words
+        self.alpha_words = alpha_words
         self.two_models = two_models
         logging.info("D2V")
 
 
     def fit(self, X, y=None):
         logging.info("D2V: got a doc2vector model %s ", (self.d2v_model, ))
+        if self.num_iters_words is None:
+            self.num_iters_words = self.num_iters
+        else:
+            self.num_iters_words = self.num_iters_words
+        if self.alpha_words is None:
+            self.alpha_words = self.alpha
+        else:
+            self.alpha_words = self.alpha_words
+
         if self.d2v_model is None and self.corpus is not None:
             logging.info("D2V: building a model with size %s, window %s, alpha %s on corpus %s" %
                          (self.size, self.window, self.alpha, self.corpus))
@@ -182,14 +191,17 @@ class ReadVectorsModel(BaseEstimator, TransformerMixin):
 
     def __init__(self, filename):
         data = np.loadtxt(filename)
-        self.labels = data[:, 0]
-        self.vectors = data[:, 1:]
+        self.vectors = {}
+        for row in data:
+            label = int(row[0])
+            self.vectors[str(label)] = row[1:]
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X):
-        return self.vectors
+        data = [self.vectors[text.labels[0]] for text in X]
+        return data
 
 class W2VStackedModel(BaseEstimator, TransformerMixin):
 
@@ -330,6 +342,9 @@ class W2VAugmentModel(BaseEstimator, TransformerMixin):
         return a
 
 
+'''
+sklearn-compatible LDA-gensim model
+'''
 class LDAModel(BaseEstimator, TransformerMixin):
 
     def __init__(self, topn=None, no_below=1, no_above=1, mallet=True):
@@ -355,6 +370,11 @@ class LDAModel(BaseEstimator, TransformerMixin):
                                          distributed=False,
                                          chunksize=2000, passes=1, update_every=5, alpha='auto',
                                          eta=None, decay=0.5, eval_every=10, iterations=50, gamma_threshold=0.001)
+
+        for topic in  self.model.show_topics(num_topics=self.topn, num_words=20, formatted=False):
+            for word in topic:
+                print word[1] + " ",
+            print ""
         return self
 
 

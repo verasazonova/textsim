@@ -53,10 +53,10 @@ stop_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), stop_filen
 print stop_path
 if os.path.isfile(stop_path):
     print "Using stopwords.txt as stopword list"
-    stop = set([word.strip() for word in open(stop_path, 'r').readlines()])
+    stop = [word.strip() for word in open(stop_path, 'r').readlines()]
 else:
     print "Using nltk stopwords"
-    stop = set(stopwords.words('english'))
+    stop = stopwords.words('english')
 #    stop = set(['a', 'the'])
 
 def word_valid(word):

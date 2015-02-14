@@ -13,6 +13,7 @@ from utils import tsne
 #from sklearn.pipeline import make_pipeline
 from sklearn.feature_extraction.text import TfidfTransformer, HashingVectorizer, TfidfVectorizer
 from ttp import ttp
+from medical import stop
 from utils.tsne import tsne
 import geograpy
 import matplotlib.pyplot as plt
@@ -77,13 +78,19 @@ class KenyanTweets():
 
     def __iter__(self):
         p = MyParser()
+        stop2 = stop+["makaburi", "rt"]
         for text in self.data:
             result = p.parse(text)
             parsed = re.sub(r'([,.?!])(?![\s.,!?])', r'\1 ', result.html)
+            processed = []
+            for word in parsed.split(' '):
+                if word.lower() not in stop2:
+                    processed.append(word.lower())
+            slimmed = " ".join(processed)
             if self.include_RT:
-                yield parsed
+                yield slimmed
             elif not parsed.startswith("RT"):
-                yield parsed
+                yield slimmed
 
     def get_labels(self):
         if self.annotated:
@@ -137,21 +144,22 @@ def run_clusterer(dataset):
 
     corpus = [text.split() for text in dataset]
 
-    lda = LDAModel(topn=5, no_below=2, no_above=1, mallet=False).fit_transform(corpus)
+    lda = LDAModel(topn=15, no_below=2, no_above=1, mallet=False).fit_transform(corpus)
 
     print lda.shape
 
-    D = cosine_distances(X)
-    print "distances computed"
-    print D.shape
+    #D = cosine_distances(X)
+    #print "distances computed"
+    #print D.shape
 
-    t = TSNE(n_components=2, init='random', metric='precomputed', perplexity=50)
+    #t = TSNE(n_components=2, init='random', metric='precomputed', perplexity=50)
 
-    data_2d = t.fit_transform(D)
+    #data_2d = t.fit_transform(D)
 
     #model2 = tsne.tsne(X, coords=True)
 
-    return data_2d, lda
+    #return data_2d, lda
+    return None, None
 
 
 def get_locations(y):
@@ -216,9 +224,9 @@ def run(arguments):
 
     X_2D, lda = run_clusterer(X)
 
-    with open(filename+"-2d.txt", 'w') as fout:
-        for row, label in zip(X_2D, indx):
-            fout.write("%s, %s, %s\n" % (row[0], row[1], label))
+    #with open(filename+"-2d.txt", 'w') as fout:
+    #    for row, label in zip(X_2D, indx):
+    #        fout.write("%s, %s, %s\n" % (row[0], row[1], label))
 
     print "Data saved"
     return X_2D, indx, lda
@@ -245,12 +253,12 @@ def __main__():
 
     data, indx, lda = run(arguments)
 
-    lbls = [np.argmax(l) for l in lda]
+    #lbls = [np.argmax(l) for l in lda]
 
-    print lbls
+    #print lbls
 
-    plt.scatter(data[:, 0], data[:, 1], c=lbls, linewidths=None, cmap=plt.cm.get_cmap('jet'))
-    plt.savefig(arguments.filename+".pdf")
+    #plt.scatter(data[:, 0], data[:, 1], c=lbls, linewidths=None, cmap=plt.cm.get_cmap('jet'))
+    #plt.savefig(arguments.filename+".pdf")
 
 
 
