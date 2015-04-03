@@ -26,7 +26,8 @@ def readarticles(filename, article_fields):
                 if not (article_dict == {}):
                     article_list.append(article_dict)
                     # reinitialize the out string
-                article_dict = {'id': dataset  + "_" +m.group(1) }
+                #article_dict = {'id': dataset  + "_" + m.group(1), 'A': '', 'T': '', 'M': '' }
+                article_dict = {'id': '_*_'+m.group(1), 'A': '', 'T': '', 'M': '' }
             else:
                 m = re.search('----([K|T|A|P|M]) (.+)', line.strip())
                 if m:
@@ -46,6 +47,31 @@ def readarticles(filename, article_fields):
         # process the write out string for the last article
         article_list.append(article_dict)
     return article_list
+
+
+def normalize(phrase):
+    norm_phrase = phrase.lower().replace('<br>', ' ').replace('<br \/', ' ')
+    for punctuation in [',', ':', '.', '(', ')', '!', '?', ':', ';', '/', '\"', '*', '^', '%', '$', '&', '<', '>', '-']:
+        norm_phrase = norm_phrase.replace(punctuation, ' ' + punctuation +' ')
+    return norm_phrase
+
+def writearticles(articles, filename):
+    print len(articles)
+    print filename
+    with open(filename, 'w') as fout:
+        for article in articles:
+            fout.write("%s %s\n" % (article['id'], normalize(article['T'] + article['A'])))
+
+def writearticles_posneg(articles, filename):
+    print len(articles)
+    print filename
+    with open(filename+'-pos.txt', 'w') as fout_pos:
+        with open(filename+'-neg.txt') as fout_neg:
+            for article in articles:
+                if article['class'] == 'I':
+                    fout_pos.write("%s\n" % (article['T'] + article['A']))
+                elif article['class'] == 'E':
+                    fout_neg.write("%s\n" % (article['T'] + article['A']))
 
 
 stop_filename = "stopwords.txt"
@@ -201,11 +227,14 @@ def __main__():
     parser.add_argument('-d', action='store', nargs="+", dest='dataset', help='Dataset name')
     arguments = parser.parse_args()
 
-    datasets, filenames = prep_arguments(arguments)
-    mra = MedicalReviewAbstracts(filenames, ['T', 'A'], labeled=True, tokenize=False)
+#    datasets, filenames = prep_arguments(arguments)
+    #mra = MedicalReviewAbstracts(filenames, ['T', 'A'], labeled=True, tokenize=False)
 #        print_stats(mra)
-    for article in mra:
-        print article
+    #for article in mra:
+    #    print article
+
+    print arguments.filename
+    writearticles(readarticles(arguments.filename[0], ['T', 'A']), "all_abstracts_id.txt")
 
 if __name__ == "__main__":
     __main__()

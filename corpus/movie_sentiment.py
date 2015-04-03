@@ -1,13 +1,17 @@
 __author__ = 'verasazonova'
 
+import logging
 import os.path
 import argparse
 from gensim.models.doc2vec import LabeledSentence, Doc2Vec
 import numpy as np
-from sklearn import linear_model, metrics, grid_search, svm
+from sklearn import linear_model, metrics, grid_search, svm, cross_validation
+from sklearn.feature_extraction.text import TfidfTransformer, HashingVectorizer, TfidfVectorizer
 from models.transformers import D2VModel, BOWModel, ReadVectorsModel
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.svm import SVC
+from medical import MedicalReviewAbstracts, stop
+from sklearn.utils import shuffle
 
 def normalize(phrase, min_count):
     norm_phrase = phrase.lower().replace('<br>', ' ').replace('<br \/', ' ')
@@ -23,6 +27,7 @@ def normalize(phrase, min_count):
 def normalize_label(label):
     return str(label)
 #   return "_*"+str(label)
+
 
 class IMDBCorpus:
     def __init__(self, filename, min_count):
@@ -309,7 +314,11 @@ def run_d2v(corpus):
 #    print scores.mean(), scores.std()
 
     #d2v_model.save_word2vec_format("sent_model.bin", binary=True)
+
+
 def __main__():
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-d', action='store', dest='directory', help='Directory')
     parser.add_argument('-v', action='store', dest='vectors', help='Directory')
@@ -317,16 +326,17 @@ def __main__():
     arguments = parser.parse_args()
 
     #corpus = MovieSentimentsCorpus(arguments.directory)
-    corpus = IMDBCorpus(arguments.directory, 9)
+    #corpus = IMDBCorpus(arguments.directory, 9)
+    corpus = MedicalReviewAbstracts(arguments.directory, ['T', 'A'], labeled=False, tokenize=False)
 
     #data = np.loadtxt(arguments.vectors)
     #labels = data[:, 0]
     #vectors = data[:, 1:]
 
 
-    clf = linear_model.LogisticRegression(C=1)
+    clf = linear_model.LogisticRegression(C=2)
     #clf = SVC(C=50.0, gamma=.01, kernel='rbf')
-    #clf = svm.SVC(C=10)
+    #clf = svm.SVC(C=50, kernel='rbf')
 
     clf_pipeline = Pipeline([
         ('features', FeatureUnion([
@@ -334,55 +344,77 @@ def __main__():
 #                             min_alpha=0.0001, num_iters=20, initial_w2v=None, two_models=True, negative=5,
 #                             sample=0.0001, hs=0, dm=0, seed=0, num_iters_words=None, alpha_words=None,
 #                             train_type="decreasing")),
-            ('d2v', ReadVectorsModel(arguments.vectors))
-            #('bow', BOWModel(no_below=2, no_above=0.9))
+            #('d2v', ReadVectorsModel(arguments.vectors))
+            #('bow', BOWModel(no_below=1, no_above=0.9))
+            ('tfidf', TfidfVectorizer(min_df=2, max_df=0.9, ngram_range=(1,1), stop_words=stop,
+                                 use_idf=True, smooth_idf=False, norm=u'l2', sublinear_tf=False, max_features=10000))
                 ])),
         ('clf', clf) ])
 
     parameters = {
-                   'features__d2v__num_iters': [5, 10, 20],
+                   'clf__C': [1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7],
 #                   'features__d2v__alpha': [0.05, 0.1],
 #                   'features__d2v__train_type': ["fixed", "decreasing"]
                    }
 
 
-    grid_clf = grid_search.GridSearchCV(clf_pipeline, param_grid=parameters, iid=False, cv=3, refit=True)
+    grid_clf = grid_search.GridSearchCV(clf_pipeline, param_grid=parameters, iid=False, cv=10, refit=True)
 
 
     #x_dev = np.array([text for text in corpus.get_dev()])
     #y_dev =  np.array([ y for y in corpus.get_target_dev()])
 
 
-    x_dev = np.array([text for text in corpus.get_train()])
-    y_dev =  np.array([ y for y in corpus.get_target_train()])
+#    x_dev = np.array([text for text in corpus.get_train()])
+#    y_dev =  np.array([ y for y in corpus.get_target_train()])
 
-    print x_dev.shape, y_dev.shape
+#    print x_dev.shape, y_dev.shape
 
+    X = np.array([text for text in corpus])
+    Y = np.array(corpus.get_target())
 
-#    grid_clf.fit(x_dev, y_dev)
+    print X.shape, Y.shape
 
-#    print grid_clf.grid_scores_
-#    print grid_clf.best_params_
-#    print grid_clf.best_score_
+    grid_clf.fit(X, Y)
 
-#    best_clf = grid_clf.best_estimator_
+    print grid_clf.grid_scores_
+    print grid_clf.best_params_
+    print grid_clf.best_score_
 
-    best_clf = clf_pipeline
+    best_clf = grid_clf.best_estimator_
 
-    x_train = np.array([text for text in corpus.get_train()])
-    y_train =  np.array([ y for y in corpus.get_target_train()])
-
-    x_test = np.array([text for text in corpus.get_test()])
-    y_test =  np.array([ y for y in corpus.get_target_test()])
+#    best_clf = clf_pipeline
 
 
-    best_clf.fit(x_train, y_train)
-    print best_clf
-    print x_test.shape, y_test.shape
-    y_predicted = best_clf.predict(x_test)
 
-    print metrics.precision_score(y_test, y_predicted)
+    n_trials = 1
+    n_cv = 10
+    scores = np.zeros((n_trials * n_cv))
+    for n in range(n_trials):
+        #logging.info("Testing: trial %i or %i" % (n, n_trials))
 
+        x_shuffled, y_shuffled = shuffle(X, Y, random_state=n)
+        skf = cross_validation.StratifiedKFold(y_shuffled, n_folds=n_cv)  # random_state=n, shuffle=True)
+        scores[n * n_cv:(n + 1) * n_cv] = cross_validation.cross_val_score(best_clf, x_shuffled, y_shuffled, cv=skf,
+                                                                           scoring='accuracy', #'roc_auc', # accuracy
+                                                                           verbose=2, n_jobs=1)
+    print scores, scores.mean(), scores.std()
+    return scores.mean()
+
+
+#    x_train = np.array([text for text in corpus.get_train()])
+#    y_train =  np.array([ y for y in corpus.get_target_train()])
+
+#    x_test = np.array([text for text in corpus.get_test()])
+#    y_test =  np.array([ y for y in corpus.get_target_test()])
+
+
+#    best_clf.fit(x_train, y_train)
+#    print best_clf
+#    print x_test.shape, y_test.shape
+#    y_predicted = best_clf.predict(x_test)
+
+#    print metrics.precision_score(y_test, y_predicted)
 
 if __name__ == "__main__":
     __main__()

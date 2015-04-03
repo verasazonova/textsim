@@ -27,8 +27,7 @@ class BOWModel(BaseEstimator, TransformerMixin):
 
         self.dictionary = corpora.Dictionary(X)
         self.dictionary.filter_extremes(no_above=self.no_above, no_below=self.no_below)
-        self.bow = [self.dictionary.doc2bow(text) for text in X]
-        self.tfidf = models.TfidfModel(self.bow, dictionary=self.dictionary, normalize=True)
+        self.tfidf = models.TfidfModel([self.dictionary.doc2bow(text) for text in X], id2word=self.dictionary, normalize=True)
         return self
 
 
@@ -37,6 +36,7 @@ class BOWModel(BaseEstimator, TransformerMixin):
         x_tfidf = self.tfidf[[self.dictionary.doc2bow(text) for text in X]]
         x_data = matutils.corpus2dense(x_tfidf, num_terms=len(self.dictionary)).T
         logging.info("Returning data of shape %s " % (x_data.shape,))
+        print x_data
         return x_data
 
 
@@ -190,13 +190,15 @@ class D2VModel(BaseEstimator, TransformerMixin):
 class ReadVectorsModel(BaseEstimator, TransformerMixin):
 
     def __init__(self, filename):
-        data = np.loadtxt(filename)
         self.vectors = {}
-        for row in data:
-            label = int(row[0])
-            self.vectors[str(label)] = row[1:]
+        self.filename = filename
 
     def fit(self, X, y=None):
+        with open(self.filename, 'r') as f:
+            for line in f:
+                data = line.split()
+                label = data[0]
+                self.vectors[str(label)] = np.array(map(float, data[1:]))
         return self
 
     def transform(self, X):
